@@ -8,13 +8,16 @@
 #include <string>
 #include <vector>
 
+class Renderer;
+
 class Board {
 private:
+  Renderer *renderer_;
   std::unique_ptr<Piece> grid_[8][8];
   Position enPassantTarget_ = {-1, -1}; // Invalid = no en passant available
 
 public:
-  Board();
+  Board(Renderer *renderer);
   Board(const Board &other);            // Deep copy
   Board &operator=(const Board &other); // Deep copy assignment
 

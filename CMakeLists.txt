@@ -14,14 +14,18 @@ option(USE_WAYLAND       "Build with Wayland support"                        ON)
 option(USE_X11           "Build with X11 support"                           OFF)
 option(AUTO_INSTALL_DEPS "Auto-install missing system deps via pkg manager" OFF)
 
-# ─── Check / install display-server dev libraries ───────────────────────────
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-include(CheckDisplayServer)
-check_display_server_deps()
+# ─── Check / install display-server dev libraries (Linux only) ───────────────
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+    include(CheckDisplayServer)
+    check_display_server_deps()
 
-# Tell SDL3 which backends to build (only matters for FetchContent path)
-set(SDL_WAYLAND ${USE_WAYLAND} CACHE BOOL "" FORCE)
-set(SDL_X11     ${USE_X11}     CACHE BOOL "" FORCE)
+    # Tell SDL3 which backends to build (only matters for FetchContent path)
+    set(SDL_WAYLAND ${USE_WAYLAND} CACHE BOOL "" FORCE)
+    set(SDL_X11     ${USE_X11}     CACHE BOOL "" FORCE)
+else()
+    message(STATUS "Non-Linux platform — skipping display-server checks")
+endif()
 
 # ─── SDL3: try system install first, fall back to FetchContent ───────────────
 find_package(SDL3 QUIET)
