@@ -7,12 +7,17 @@
     },
     "configurePresets": [
         {
+            "name": "base-vcpkg",
+            "hidden": true,
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        },
+        {
             "name": "mingw",
             "displayName": "MinGW 64-bit (Windows)",
             "description": "Build with MinGW-w64 on Windows — gcc/g++ must be in PATH",
+            "inherits": "base-vcpkg",
             "generator": "MinGW Makefiles",
             "binaryDir": "${sourceDir}/build",
-            "toolchainFile": "${sourceDir}/cmake/toolchains/mingw64.cmake",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -20,7 +25,9 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_MAKE_PROGRAM": "mingw32-make"
+                "CMAKE_MAKE_PROGRAM": "mingw32-make",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw64.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
             }
         },
         {
@@ -37,7 +44,7 @@
             "displayName": "Linux Debug (GCC)",
             "description": "Debug build on Linux with default system compiler",
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build",
+            "binaryDir": "${sourceDir}/build/linux-debug",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -52,6 +59,7 @@
             "displayName": "Linux Release (GCC)",
             "description": "Optimized release build on Linux",
             "inherits": "linux-debug",
+            "binaryDir": "${sourceDir}/build/linux-release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }

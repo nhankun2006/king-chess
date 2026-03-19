@@ -1,41 +1,36 @@
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+#include <cstdio>
+
+#define Color RaylibColor
+#include <raylib.h>
+#undef Color
+
 #include "Game.h"
 
-int main(int argc, char *argv[]) {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    SDL_Log("SDL_Init failed: %s", SDL_GetError());
+int main() {
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "King Chess");
+  if (!IsWindowReady()) {
+    std::fprintf(stderr, "InitWindow failed\n");
     return 1;
   }
 
-  SDL_Window *window = SDL_CreateWindow("King Chess", 800, 600, 0);
-  if (!window) {
-    SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
-    SDL_Quit();
-    return 1;
-  }
-
-  SDL_Log("SDL3 initialized successfully!");
+  SetTargetFPS(60);
+  std::puts("raylib initialized successfully");
 
   // ── Initialize chess game ───────────────────────────────────────────
   Game game;
-  SDL_Log("Initial board: %s", game.getBoard().toFEN().c_str());
-  SDL_Log("Current turn: %s",
-          game.getCurrentTurn() == Color::White ? "White" : "Black");
+  std::printf("Initial board: %s\n", game.getBoard().toFEN().c_str());
+  std::printf("Current turn: %s\n",
+              game.getCurrentTurn() == Color::White ? "White" : "Black");
 
-  // Simple event loop — close on quit
-  bool running = true;
-  while (running) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_EVENT_QUIT) {
-        running = false;
-      }
-    }
-    SDL_Delay(16); // ~60 fps
+  while (!WindowShouldClose()) {
+    BeginDrawing();
+    ClearBackground({245, 245, 245, 255});
+    DrawText("King Chess", 20, 20, 32, {70, 70, 70, 255});
+    DrawText("raylib migration baseline", 20, 60, 20, {120, 120, 120, 255});
+    EndDrawing();
   }
 
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  CloseWindow();
   return 0;
 }

@@ -45,3 +45,11 @@ build/
 
 # CMake cache
 *.cache
+
+# vcpkg
+vcpkg/
+vcpkg_installed/
+
+# local setting
+.clangd
+.vscode/
