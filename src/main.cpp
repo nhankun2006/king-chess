@@ -1,41 +1,33 @@
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+#include <cstdio>
+
+#define Color RaylibColor
+#include <raylib.h>
+#undef Color
+
+#include "ChessControllder.h"
+#include "ChessView.h"
 #include "Game.h"
 
-int main(int argc, char *argv[]) {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    SDL_Log("SDL_Init failed: %s", SDL_GetError());
+int main() {
+  InitWindow(512, 512, "King Chess");
+  if (!IsWindowReady()) {
+    std::fprintf(stderr, "InitWindow failed\n");
     return 1;
   }
 
-  SDL_Window *window = SDL_CreateWindow("King Chess", 800, 600, 0);
-  if (!window) {
-    SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
-    SDL_Quit();
-    return 1;
-  }
-
-  SDL_Log("SDL3 initialized successfully!");
-
-  // ── Initialize chess game ───────────────────────────────────────────
+  SetTargetFPS(60);
   Game game;
-  SDL_Log("Initial board: %s", game.getBoard().toFEN().c_str());
-  SDL_Log("Current turn: %s",
-          game.getCurrentTurn() == Color::White ? "White" : "Black");
+  ChessView view;
+  ChessController controller(game, view);
 
-  // Simple event loop — close on quit
-  bool running = true;
-  while (running) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_EVENT_QUIT) {
-        running = false;
-      }
-    }
-    SDL_Delay(16); // ~60 fps
+  if (!view.LoadAssets()) {
+    std::fprintf(stderr, "Failed to load chess assets\n");
+    CloseWindow();
+    return 1;
   }
 
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  controller.run();
+
+  CloseWindow();
   return 0;
 }

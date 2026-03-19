@@ -1,0 +1,16 @@
+{
+  "name": "king-chess",
+  "version-string": "0.1.0",
+  "dependencies": [
+    {
+      "name": "sdl3",
+      "default-features": false,
+      "features": ["x11"]
+    },
+    {
+      "name": "sdl3-image",
+      "default-features": false,
+      "features": ["png"]
+    }
+  ]
+}

@@ -1,45 +1,40 @@
 # King Chess
 
-A modern chess game built with SDL3 and C++, featuring a built-in AI opponent.
+A modern chess game built with raylib and C++.
 
-## Features
+## Build Dependencies
 
-- **Modern Graphics**: Clean, responsive UI.
-- **AI Opponent**: Play against an intelligent chess engine.
-- **Cross-Platform**: Built with SDL3 for Windows, macOS, and Linux.
+- C++17 compiler
+- CMake 3.20+
+- raylib
 
-## Getting Started
+### Linux (system raylib)
 
-### Prerequisites
+This project is set up to use system-installed raylib on Linux.
 
-- **SDL3**: The Simple DirectMedia Layer.
-- **C++ Compiler**: Supporting C++17 or later.
-- **CMake**: For building the project.
-- **Make**: For building the project.
-
-### Installation
-
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository-url>
-    cd king-chess
-    ```
-
-2.  **Build the project**:
-    ```bash
-    mkdir build
-    cd build
-    cmake ..
-    make
-    ```
-
-### Running the Game
-
-After a successful build, run the executable:
+Fedora example:
 
 ```bash
-./king-chess
+sudo dnf install raylib-devel
 ```
+
+Configure and build:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+```
+
+Run:
+
+```bash
+./build/king-chess
+```
+
+### Windows (later / optional)
+
+Windows support is prepared for `vcpkg` via `find_package(raylib CONFIG REQUIRED)`.
+You can wire up a vcpkg toolchain later without changing Linux setup.
 
 ## License
 

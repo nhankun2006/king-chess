@@ -1,0 +1,130 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base-vcpkg",
+            "hidden": true,
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        },
+        {
+            "name": "mingw",
+            "displayName": "MinGW 64-bit (Windows)",
+            "description": "Build with MinGW-w64 on Windows — gcc/g++ must be in PATH",
+            "inherits": "base-vcpkg",
+            "generator": "MinGW Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_MAKE_PROGRAM": "mingw32-make",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw64.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
+            }
+        },
+        {
+            "name": "mingw-release",
+            "displayName": "MinGW 64-bit Release (Windows)",
+            "description": "Optimized release build with MinGW-w64",
+            "inherits": "mingw",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug (GCC)",
+            "description": "Debug build on Linux with default system compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/linux-debug",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux Release (GCC)",
+            "description": "Optimized release build on Linux",
+            "inherits": "linux-debug",
+            "binaryDir": "${sourceDir}/build/linux-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "macos-debug",
+            "displayName": "macOS Debug (Clang)",
+            "description": "Debug build on macOS with default Apple Clang",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "macos-release",
+            "displayName": "macOS Release (Clang)",
+            "description": "Optimized release build on macOS",
+            "inherits": "macos-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "mingw-build",
+            "displayName": "Build (MinGW)",
+            "configurePreset": "mingw",
+            "jobs": 8
+        },
+        {
+            "name": "mingw-release-build",
+            "displayName": "Build Release (MinGW)",
+            "configurePreset": "mingw-release",
+            "jobs": 8
+        },
+        {
+            "name": "linux-build",
+            "displayName": "Build (Linux)",
+            "configurePreset": "linux-debug",
+            "jobs": 8
+        },
+        {
+            "name": "linux-release-build",
+            "displayName": "Build Release (Linux)",
+            "configurePreset": "linux-release",
+            "jobs": 8
+        },
+        {
+            "name": "macos-build",
+            "displayName": "Build (macOS)",
+            "configurePreset": "macos-debug",
+            "jobs": 8
+        },
+        {
+            "name": "macos-release-build",
+            "displayName": "Build Release (macOS)",
+            "configurePreset": "macos-release",
+            "jobs": 8
+        }
+    ]
+}
