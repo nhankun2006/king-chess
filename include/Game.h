@@ -4,6 +4,7 @@
 #include "Types.h"
 #include "Move.h"
 #include "Board.h"
+#include "Observer.h"
 #include <vector>
 
 class Game {
@@ -12,6 +13,7 @@ private:
   Color currentTurn_ = Color::White;
   GameState state_ = GameState::Playing;
   std::vector<Move> moveHistory_;
+  std::vector<Observer *> observers_;
 
   // Castling rights: [White kingside, White queenside, Black kingside, Black
   // queenside]
@@ -21,6 +23,11 @@ private:
   bool wouldBeInCheck(const Move &move, Color color) const;
   void updateCastlingRights(const Move &move);
   void updateGameState();
+  void notifyMoveMade(Position from, Position to);
+  void notifyCheck(Color color);
+  void notifyCheckmate(Color color);
+  void notifyStalemate();
+  void notifyDraw();
 
 public:
   Game();
@@ -41,6 +48,10 @@ public:
 
   // Execute a move; returns false if the move is illegal
   bool makeMove(const Move &move);
+
+  // Observer pattern
+  void attach(Observer *observer);
+  void detach(Observer *observer);
 };
 
 #endif // GAME_H
