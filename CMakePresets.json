@@ -27,6 +27,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_MAKE_PROGRAM": "mingw32-make",
                 "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw64.cmake",
+                "VCPKG_HOST_TRIPLET": "x64-mingw-dynamic",
                 "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
             }
         },

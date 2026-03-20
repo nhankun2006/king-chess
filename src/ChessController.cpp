@@ -1,15 +1,5 @@
 #include "ChessControllder.h"
 
-namespace {
-constexpr int kBoardSizePx = 512;
-constexpr int kCellSizePx = 64;
-
-bool isInsideBoard(float x, float y) {
-  return x >= 0.0f && x < static_cast<float>(kBoardSizePx) && y >= 0.0f &&
-         y < static_cast<float>(kBoardSizePx);
-}
-} // namespace
-
 void ChessController::updateSelection(Position pos) {
   selectedSquare_ = pos;
   selectedLegalMoves_ = game_->getLegalMoves(pos);
@@ -24,11 +14,10 @@ void ChessController::run() {
   while (!WindowShouldClose()) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       const Vector2 mousePos = GetMousePosition();
-      if (isInsideBoard(mousePos.x, mousePos.y)) {
-        const Position clickedSquare = {
-            static_cast<int>(mousePos.y) / kCellSizePx,
-            static_cast<int>(mousePos.x) / kCellSizePx,
-        };
+      const auto clickedSquareOpt =
+          view_->screenToBoardSquare(mousePos.x, mousePos.y);
+      if (clickedSquareOpt.has_value()) {
+        const Position clickedSquare = *clickedSquareOpt;
 
         const Piece *clickedPiece = game_->getBoard().getPieceAt(clickedSquare);
 
