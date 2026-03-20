@@ -9,7 +9,7 @@
 #include "Game.h"
 
 int main() {
-  InitWindow(512, 512, "King Chess");
+  InitWindow(700, 512, "King Chess");
   if (!IsWindowReady()) {
     std::fprintf(stderr, "InitWindow failed\n");
     return 1;

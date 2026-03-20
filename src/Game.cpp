@@ -207,3 +207,15 @@ bool Game::makeMove(const Move &move) {
 
   return true;
 }
+
+void Game::restart() {
+  board_.clear();
+  board_.setupInitialPosition();
+  currentTurn_ = Color::White;
+  state_ = GameState::Playing;
+  moveHistory_.clear();
+  castlingRights_[0] = true;
+  castlingRights_[1] = true;
+  castlingRights_[2] = true;
+  castlingRights_[3] = true;
+}

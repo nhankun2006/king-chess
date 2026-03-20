@@ -13,6 +13,7 @@ private:
   ChessView *view_ = nullptr;
   std::optional<Position> selectedSquare_;
   std::vector<Move> selectedLegalMoves_;
+  bool restartConfirmOpen_ = false;
 
   void updateSelection(Position pos);
   void clearSelection();

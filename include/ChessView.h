@@ -23,15 +23,23 @@
 class ChessView : public Observer {
 private:
   Texture2D boardTexture_{};
+  Texture2D rotateIconTexture_{};
+  Texture2D restartIconTexture_{};
   std::map<PieceType, Texture2D> whiteTextures_;
   std::map<PieceType, Texture2D> blackTextures_;
   std::map<PieceType, Rectangle> whiteSourceRects_;
   std::map<PieceType, Rectangle> blackSourceRects_;
   std::map<PieceType, float> whiteCenterOffsetX_;
   std::map<PieceType, float> blackCenterOffsetX_;
+  bool isBoardFlipped_ = false;
   std::string lastAssetError_;
 
   Rectangle getBoardGridRect() const;
+  Rectangle getRotateButtonRect() const;
+  Rectangle getRestartButtonRect() const;
+  Rectangle getRestartConfirmDialogRect() const;
+  Rectangle getRestartConfirmYesButtonRect() const;
+  Rectangle getRestartConfirmNoButtonRect() const;
 
 public:
   ChessView() = default;
@@ -39,6 +47,12 @@ public:
   ~ChessView() {
     if (boardTexture_.id != 0) {
       UnloadTexture(boardTexture_);
+    }
+    if (rotateIconTexture_.id != 0) {
+      UnloadTexture(rotateIconTexture_);
+    }
+    if (restartIconTexture_.id != 0) {
+      UnloadTexture(restartIconTexture_);
     }
 
     for (auto &entry : whiteTextures_) {
@@ -55,12 +69,18 @@ public:
 
   bool LoadAssets();
   const std::string &getLastAssetError() const { return lastAssetError_; }
+  void toggleBoardOrientation() { isBoardFlipped_ = !isBoardFlipped_; }
+  bool isRotateButtonClicked(float x, float y) const;
+  bool isRestartButtonClicked(float x, float y) const;
+  bool isRestartConfirmYesClicked(float x, float y) const;
+  bool isRestartConfirmNoClicked(float x, float y) const;
   std::optional<Position> screenToBoardSquare(float x, float y) const;
   void drawPiece(PieceType type, ::Color color, float x, float y, float w,
                  float h);
   void drawBoard(const Board &board,
                  const std::optional<Position> &selectedSquare = std::nullopt,
-                 const std::vector<Move> &legalMoves = {});
+                 const std::vector<Move> &legalMoves = {},
+                 bool showRestartConfirm = false);
 
   void onMoveMade(Position from, Position to) override {
     (void)from;
@@ -78,6 +98,14 @@ public:
 
 inline bool ChessView::LoadAssets() {
   lastAssetError_.clear();
+  if (rotateIconTexture_.id != 0) {
+    UnloadTexture(rotateIconTexture_);
+    rotateIconTexture_ = {};
+  }
+  if (restartIconTexture_.id != 0) {
+    UnloadTexture(restartIconTexture_);
+    restartIconTexture_ = {};
+  }
   whiteSourceRects_.clear();
   blackSourceRects_.clear();
   whiteCenterOffsetX_.clear();
@@ -208,6 +236,9 @@ inline bool ChessView::LoadAssets() {
     return false;
   }
 
+  loadTextureWithFallback("rotate_feature.png", rotateIconTexture_);
+  loadTextureWithFallback("restart_feature.png", restartIconTexture_);
+
   static const std::pair<PieceType, std::string> pieces[] = {
       {PieceType::Pawn, "Pawn"},     {PieceType::Knight, "Knight"},
       {PieceType::Bishop, "Bishop"}, {PieceType::Rook, "Rook"},
@@ -271,6 +302,78 @@ inline Rectangle ChessView::getBoardGridRect() const {
   return {gridLeft, gridTop, gridWidth, gridHeight};
 }
 
+inline Rectangle ChessView::getRotateButtonRect() const {
+  const int panelX = 512;
+  const int panelWidth = GetScreenWidth() - panelX;
+  if (panelWidth <= 0) {
+    return {0.0f, 0.0f, 0.0f, 0.0f};
+  }
+
+  constexpr float kButtonSize = 44.0f;
+  constexpr float kButtonGap = 12.0f;
+  const float totalWidth = kButtonSize * 2.0f + kButtonGap;
+  const float startX =
+      static_cast<float>(panelX) + (static_cast<float>(panelWidth) - totalWidth) * 0.5f;
+  return {startX, 236.0f, kButtonSize, kButtonSize};
+}
+
+inline Rectangle ChessView::getRestartButtonRect() const {
+  const Rectangle rotateButton = getRotateButtonRect();
+  return {rotateButton.x + rotateButton.width + 12.0f, rotateButton.y,
+          rotateButton.width, rotateButton.height};
+}
+
+inline Rectangle ChessView::getRestartConfirmDialogRect() const {
+  constexpr float kDialogWidth = 320.0f;
+  constexpr float kDialogHeight = 150.0f;
+  const float x = (static_cast<float>(GetScreenWidth()) - kDialogWidth) * 0.5f;
+  const float y = (512.0f - kDialogHeight) * 0.5f;
+  return {x, y, kDialogWidth, kDialogHeight};
+}
+
+inline Rectangle ChessView::getRestartConfirmYesButtonRect() const {
+  const Rectangle dialog = getRestartConfirmDialogRect();
+  return {dialog.x + 34.0f, dialog.y + dialog.height - 52.0f, 110.0f, 34.0f};
+}
+
+inline Rectangle ChessView::getRestartConfirmNoButtonRect() const {
+  const Rectangle dialog = getRestartConfirmDialogRect();
+  return {dialog.x + dialog.width - 34.0f - 110.0f,
+          dialog.y + dialog.height - 52.0f, 110.0f, 34.0f};
+}
+
+inline bool ChessView::isRotateButtonClicked(float x, float y) const {
+  const Rectangle rotateButton = getRotateButtonRect();
+  if (rotateButton.width <= 0.0f || rotateButton.height <= 0.0f) {
+    return false;
+  }
+
+  return x >= rotateButton.x && x <= rotateButton.x + rotateButton.width &&
+         y >= rotateButton.y && y <= rotateButton.y + rotateButton.height;
+}
+
+inline bool ChessView::isRestartButtonClicked(float x, float y) const {
+  const Rectangle restartButton = getRestartButtonRect();
+  if (restartButton.width <= 0.0f || restartButton.height <= 0.0f) {
+    return false;
+  }
+
+  return x >= restartButton.x && x <= restartButton.x + restartButton.width &&
+         y >= restartButton.y && y <= restartButton.y + restartButton.height;
+}
+
+inline bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
+  const Rectangle yesButton = getRestartConfirmYesButtonRect();
+  return x >= yesButton.x && x <= yesButton.x + yesButton.width &&
+         y >= yesButton.y && y <= yesButton.y + yesButton.height;
+}
+
+inline bool ChessView::isRestartConfirmNoClicked(float x, float y) const {
+  const Rectangle noButton = getRestartConfirmNoButtonRect();
+  return x >= noButton.x && x <= noButton.x + noButton.width &&
+         y >= noButton.y && y <= noButton.y + noButton.height;
+}
+
 inline std::optional<Position> ChessView::screenToBoardSquare(float x,
                                                               float y) const {
   const Rectangle grid = getBoardGridRect();
@@ -281,8 +384,11 @@ inline std::optional<Position> ChessView::screenToBoardSquare(float x,
 
   const float cellW = grid.width / 8.0f;
   const float cellH = grid.height / 8.0f;
-  const int col = static_cast<int>((x - grid.x) / cellW);
-  const int row = static_cast<int>((y - grid.y) / cellH);
+  const int displayCol = static_cast<int>((x - grid.x) / cellW);
+  const int displayRow = static_cast<int>((y - grid.y) / cellH);
+
+  const int col = isBoardFlipped_ ? (7 - displayCol) : displayCol;
+  const int row = isBoardFlipped_ ? (7 - displayRow) : displayRow;
 
   return Position{row, col};
 }
@@ -332,13 +438,20 @@ inline void ChessView::drawPiece(PieceType type, ::Color color, float x,
 
 inline void ChessView::drawBoard(const Board &board,
                                  const std::optional<Position> &selectedSquare,
-                                 const std::vector<Move> &legalMoves) {
+                                 const std::vector<Move> &legalMoves,
+                                 bool showRestartConfirm) {
   BeginDrawing();
   ClearBackground({0, 0, 0, 255});
 
   if (boardTexture_.id != 0) {
-    const Rectangle src = {0.0f, 0.0f, static_cast<float>(boardTexture_.width),
-                           static_cast<float>(boardTexture_.height)};
+    Rectangle src = {0.0f, 0.0f, static_cast<float>(boardTexture_.width),
+                     static_cast<float>(boardTexture_.height)};
+    if (isBoardFlipped_) {
+      src = {static_cast<float>(boardTexture_.width),
+             static_cast<float>(boardTexture_.height),
+             -static_cast<float>(boardTexture_.width),
+             -static_cast<float>(boardTexture_.height)};
+    }
     const Rectangle dst = {0.0f, 0.0f, 512.0f, 512.0f};
     DrawTexturePro(boardTexture_, src, dst, {0.0f, 0.0f}, 0.0f,
                    {255, 255, 255, 255});
@@ -349,9 +462,11 @@ inline void ChessView::drawBoard(const Board &board,
   const float cellH = grid.height / 8.0f;
 
   for (const auto &move : legalMoves) {
+    const int displayCol = isBoardFlipped_ ? (7 - move.to.col) : move.to.col;
+    const int displayRow = isBoardFlipped_ ? (7 - move.to.row) : move.to.row;
     DrawRectangleRec(
-        {grid.x + static_cast<float>(move.to.col) * cellW,
-         grid.y + static_cast<float>(move.to.row) * cellH, cellW, cellH},
+        {grid.x + static_cast<float>(displayCol) * cellW,
+         grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
         {0, 255, 0, 90});
   }
 
@@ -359,19 +474,283 @@ inline void ChessView::drawBoard(const Board &board,
     for (int col = 0; col < 8; ++col) {
       const Piece *piece = board.getPieceAt({row, col});
       if (piece) {
+        const int displayCol = isBoardFlipped_ ? (7 - col) : col;
+        const int displayRow = isBoardFlipped_ ? (7 - row) : row;
         drawPiece(piece->getType(), piece->getColor(),
-                  grid.x + static_cast<float>(col) * cellW,
-                  grid.y + static_cast<float>(row) * cellH, cellW, cellH);
+                  grid.x + static_cast<float>(displayCol) * cellW,
+                  grid.y + static_cast<float>(displayRow) * cellH, cellW,
+                  cellH);
       }
     }
   }
 
   if (selectedSquare.has_value()) {
+    const int displayCol =
+        isBoardFlipped_ ? (7 - selectedSquare->col) : selectedSquare->col;
+    const int displayRow =
+        isBoardFlipped_ ? (7 - selectedSquare->row) : selectedSquare->row;
     DrawRectangleLinesEx(
-        {grid.x + static_cast<float>(selectedSquare->col) * cellW,
-         grid.y + static_cast<float>(selectedSquare->row) * cellH, cellW,
-         cellH},
+        {grid.x + static_cast<float>(displayCol) * cellW,
+         grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
         3.0f, {255, 255, 0, 255});
+  }
+
+  auto getInitialCount = [](PieceType type) -> int {
+    switch (type) {
+    case PieceType::Pawn:
+      return 8;
+    case PieceType::Knight:
+    case PieceType::Bishop:
+    case PieceType::Rook:
+      return 2;
+    case PieceType::Queen:
+    case PieceType::King:
+      return 1;
+    default:
+      return 0;
+    }
+  };
+
+  std::map<PieceType, int> whiteRemaining;
+  std::map<PieceType, int> blackRemaining;
+
+  for (int row = 0; row < 8; ++row) {
+    for (int col = 0; col < 8; ++col) {
+      const Piece *piece = board.getPieceAt({row, col});
+      if (piece == nullptr) {
+        continue;
+      }
+
+      const PieceType type = piece->getType();
+      if (piece->getColor() == ::Color::White) {
+        whiteRemaining[type] += 1;
+      } else {
+        blackRemaining[type] += 1;
+      }
+    }
+  }
+
+  std::map<PieceType, int> capturedBlackPieces;
+  std::map<PieceType, int> capturedWhitePieces;
+  const std::vector<PieceType> pieceOrder = {
+      PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight,
+      PieceType::Pawn};
+
+  for (const PieceType type : pieceOrder) {
+    int blackCaptured = getInitialCount(type) - blackRemaining[type];
+    if (blackCaptured < 0) {
+      blackCaptured = 0;
+    }
+    int whiteCaptured = getInitialCount(type) - whiteRemaining[type];
+    if (whiteCaptured < 0) {
+      whiteCaptured = 0;
+    }
+    capturedBlackPieces[type] = blackCaptured;
+    capturedWhitePieces[type] = whiteCaptured;
+  }
+
+  auto drawCapturedSection = [&](int sectionX, int sectionY, int sectionWidth,
+                                 const char *title, ::Color capturedColor,
+                                 const std::map<PieceType, int> &captured)
+      -> int {
+    DrawText(title, sectionX + 12, sectionY + 8, 18, {235, 235, 235, 255});
+
+    const float iconW = 24.0f;
+    const float iconH = 24.0f;
+    const float gap = 4.0f;
+    const int maxPerRow = (sectionWidth - 20) / static_cast<int>(iconW + gap);
+    const int safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
+    float iconX = static_cast<float>(sectionX + 10);
+    float iconY = static_cast<float>(sectionY + 34);
+    int drawn = 0;
+
+    for (const PieceType type : pieceOrder) {
+      const int count = captured.at(type);
+      for (int index = 0; index < count; ++index) {
+        drawPiece(type, capturedColor, iconX, iconY, iconW, iconH);
+        drawn += 1;
+        if (drawn % safeMaxPerRow == 0) {
+          iconX = static_cast<float>(sectionX + 10);
+          iconY += iconH + gap;
+        } else {
+          iconX += iconW + gap;
+        }
+      }
+    }
+
+    if (drawn == 0) {
+      DrawText("-", sectionX + 14, sectionY + 36, 24, {180, 180, 180, 255});
+      return 68;
+    }
+
+    const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
+    return 38 + rows * static_cast<int>(iconH + gap);
+  };
+
+  auto getCapturedSectionHeight = [&](int sectionWidth,
+                                      const std::map<PieceType, int> &captured)
+      -> int {
+    const float iconW = 24.0f;
+    const float iconH = 24.0f;
+    const float gap = 4.0f;
+    const int maxPerRow = (sectionWidth - 20) / static_cast<int>(iconW + gap);
+    const int safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
+
+    int drawn = 0;
+    for (const PieceType type : pieceOrder) {
+      drawn += captured.at(type);
+    }
+
+    if (drawn == 0) {
+      return 68;
+    }
+
+    const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
+    return 38 + rows * static_cast<int>(iconH + gap);
+  };
+
+  const int screenWidth = GetScreenWidth();
+  const int rightPanelX = 512;
+  const int rightPanelWidth = screenWidth - rightPanelX;
+
+  if (rightPanelWidth > 0) {
+    DrawRectangle(rightPanelX, 0, rightPanelWidth, 512, {26, 30, 40, 255});
+    DrawLine(rightPanelX, 0, rightPanelX, 512, {70, 80, 100, 255});
+
+    const Vector2 mousePos = GetMousePosition();
+    const Rectangle rotateButton = getRotateButtonRect();
+    const Rectangle restartButton = getRestartButtonRect();
+    const bool rotateHovered = CheckCollisionPointRec(mousePos, rotateButton);
+    const bool restartHovered =
+        CheckCollisionPointRec(mousePos, restartButton);
+
+    auto drawRoundedIconButton = [&](Rectangle buttonRect, bool hovered) {
+      if (hovered) {
+        buttonRect.x -= 1.5f;
+        buttonRect.y -= 1.5f;
+        buttonRect.width += 3.0f;
+        buttonRect.height += 3.0f;
+      }
+
+      DrawRectangleRounded(buttonRect, 0.35f, 10,
+               hovered ? GetColor(0x485670FF)
+                 : GetColor(0x303A4EFF));
+      DrawRectangleRoundedLinesEx(buttonRect, 0.35f, 10, 2.0f,
+                hovered ? GetColor(0x8498BEFF)
+                  : GetColor(0x5A6982FF));
+    };
+
+    drawRoundedIconButton(rotateButton, rotateHovered);
+    drawRoundedIconButton(restartButton, restartHovered);
+
+    if (rotateIconTexture_.id != 0) {
+      const Rectangle iconSrc = {0.0f, 0.0f,
+                                 static_cast<float>(rotateIconTexture_.width),
+                                 static_cast<float>(rotateIconTexture_.height)};
+      const Rectangle iconDst = {rotateButton.x +
+                                     (rotateButton.width - 24.0f) * 0.5f,
+                                 rotateButton.y +
+                                     (rotateButton.height - 24.0f) * 0.5f,
+                                 24.0f, 24.0f};
+      DrawTexturePro(rotateIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
+                     {255, 255, 255, 255});
+    } else {
+      DrawText("R", static_cast<int>(rotateButton.x + 14),
+               static_cast<int>(rotateButton.y + 9), 24,
+               {235, 235, 235, 255});
+    }
+
+    if (restartIconTexture_.id != 0) {
+      const Rectangle iconSrc = {0.0f, 0.0f,
+                                 static_cast<float>(restartIconTexture_.width),
+                                 static_cast<float>(restartIconTexture_.height)};
+      const Rectangle iconDst = {restartButton.x +
+                                     (restartButton.width - 24.0f) * 0.5f,
+                                 restartButton.y +
+                                     (restartButton.height - 24.0f) * 0.5f,
+                                 24.0f, 24.0f};
+      DrawTexturePro(restartIconTexture_, iconSrc, iconDst, {0.0f, 0.0f},
+                     0.0f, {255, 255, 255, 255});
+    } else {
+      const float cx = restartButton.x + restartButton.width * 0.5f;
+      const float cy = restartButton.y + restartButton.height * 0.5f;
+      DrawRing({cx, cy}, 8.0f, 12.0f, 35.0f, 320.0f, 24,
+               {235, 235, 235, 255});
+      DrawTriangle({cx + 9.0f, cy - 12.0f}, {cx + 15.0f, cy - 6.0f},
+                   {cx + 6.0f, cy - 4.0f}, {235, 235, 235, 255});
+    }
+
+    auto drawCenteredHoverText = [&](Rectangle buttonRect, const char *text) {
+      constexpr int kTooltipFontSize = 14;
+      const int textWidth = MeasureText(text, kTooltipFontSize);
+      const float buttonCenterX = buttonRect.x + buttonRect.width * 0.5f;
+      const int textX = static_cast<int>(buttonCenterX - textWidth * 0.5f);
+      const int textY = static_cast<int>(buttonRect.y - 20.0f);
+      DrawText(text, textX, textY, kTooltipFontSize, {210, 220, 235, 255});
+    };
+
+    if (rotateHovered) {
+      drawCenteredHoverText(rotateButton, "Rotate board");
+    }
+    if (restartHovered) {
+      drawCenteredHoverText(restartButton, "Restart game");
+    }
+
+    const int whiteSectionY = 8;
+    const int whiteSectionBottom =
+        whiteSectionY + drawCapturedSection(rightPanelX, whiteSectionY,
+                                            rightPanelWidth, "White captured",
+                                            ::Color::Black,
+                                            capturedBlackPieces);
+
+    const int blackSectionHeight =
+        getCapturedSectionHeight(rightPanelWidth, capturedWhitePieces);
+    int blackSectionY = 512 - 8 - blackSectionHeight;
+    if (blackSectionY < whiteSectionBottom + 12) {
+      blackSectionY = whiteSectionBottom + 12;
+    }
+
+    drawCapturedSection(rightPanelX, blackSectionY, rightPanelWidth,
+                        "Black captured", ::Color::White,
+                        capturedWhitePieces);
+  }
+
+  if (showRestartConfirm) {
+    DrawRectangle(0, 0, GetScreenWidth(), 512, {0, 0, 0, 120});
+
+    const Rectangle dialog = getRestartConfirmDialogRect();
+    const Rectangle yesButton = getRestartConfirmYesButtonRect();
+    const Rectangle noButton = getRestartConfirmNoButtonRect();
+    const Vector2 mousePos = GetMousePosition();
+
+    DrawRectangleRounded(dialog, 0.16f, 12, {32, 38, 50, 255});
+    DrawRectangleRoundedLinesEx(dialog, 0.16f, 12, 2.0f, {110, 124, 150, 255});
+    DrawText("Restart game?", static_cast<int>(dialog.x + 90),
+             static_cast<int>(dialog.y + 22), 24, {235, 235, 235, 255});
+    DrawText("Current match progress will be lost.",
+             static_cast<int>(dialog.x + 26), static_cast<int>(dialog.y + 58),
+             16, {195, 205, 220, 255});
+
+    const bool yesHovered = CheckCollisionPointRec(mousePos, yesButton);
+    const bool noHovered = CheckCollisionPointRec(mousePos, noButton);
+
+    DrawRectangleRounded(yesButton, 0.25f, 8,
+                         yesHovered ? GetColor(0x3E8D5CFF)
+                                    : GetColor(0x2F724AFF));
+    DrawRectangleRoundedLinesEx(yesButton, 0.25f, 8, 2.0f,
+                                yesHovered ? GetColor(0x6EC798FF)
+                                           : GetColor(0x4A9A6BFF));
+    DrawText("Yes", static_cast<int>(yesButton.x + 38),
+             static_cast<int>(yesButton.y + 8), 20, {240, 245, 240, 255});
+
+    DrawRectangleRounded(noButton, 0.25f, 8,
+                         noHovered ? GetColor(0x8A4545FF)
+                                   : GetColor(0x703838FF));
+    DrawRectangleRoundedLinesEx(noButton, 0.25f, 8, 2.0f,
+                                noHovered ? GetColor(0xCF7C7CFF)
+                                          : GetColor(0xA55D5DFF));
+    DrawText("No", static_cast<int>(noButton.x + 42),
+             static_cast<int>(noButton.y + 8), 20, {245, 240, 240, 255});
   }
 
   EndDrawing();

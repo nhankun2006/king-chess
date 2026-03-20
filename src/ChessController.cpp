@@ -14,9 +14,36 @@ void ChessController::run() {
   while (!WindowShouldClose()) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       const Vector2 mousePos = GetMousePosition();
-      const auto clickedSquareOpt =
-          view_->screenToBoardSquare(mousePos.x, mousePos.y);
-      if (clickedSquareOpt.has_value()) {
+
+      if (restartConfirmOpen_) {
+        if (view_->isRestartConfirmYesClicked(mousePos.x, mousePos.y)) {
+          game_->restart();
+          clearSelection();
+          restartConfirmOpen_ = false;
+        } else if (view_->isRestartConfirmNoClicked(mousePos.x, mousePos.y)) {
+          restartConfirmOpen_ = false;
+        }
+        view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                         restartConfirmOpen_);
+        continue;
+      }
+
+      bool handledUiClick = false;
+
+      if (view_->isRotateButtonClicked(mousePos.x, mousePos.y)) {
+        view_->toggleBoardOrientation();
+        handledUiClick = true;
+      }
+
+      if (!handledUiClick && view_->isRestartButtonClicked(mousePos.x, mousePos.y)) {
+        restartConfirmOpen_ = true;
+        handledUiClick = true;
+      }
+
+      if (!handledUiClick) {
+        const auto clickedSquareOpt =
+            view_->screenToBoardSquare(mousePos.x, mousePos.y);
+        if (clickedSquareOpt.has_value()) {
         const Position clickedSquare = *clickedSquareOpt;
 
         const Piece *clickedPiece = game_->getBoard().getPieceAt(clickedSquare);
@@ -48,8 +75,10 @@ void ChessController::run() {
           }
         }
       }
+      }
     }
 
-    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_);
+    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                     restartConfirmOpen_);
   }
 }

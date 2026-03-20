@@ -48,6 +48,7 @@ public:
 
   // Execute a move; returns false if the move is illegal
   bool makeMove(const Move &move);
+  void restart();
 
   // Observer pattern
   void attach(Observer *observer);
