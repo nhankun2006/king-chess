@@ -9,6 +9,7 @@
 #include "Game.h"
 
 int main() {
+  SetConfigFlags(FLAG_VSYNC_HINT);
   InitWindow(700, 512, "King Chess");
   if (!IsWindowReady()) {
     std::fprintf(stderr, "InitWindow failed\n");

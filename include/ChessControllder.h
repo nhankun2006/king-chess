@@ -14,6 +14,7 @@ private:
   std::optional<Position> selectedSquare_;
   std::vector<Move> selectedLegalMoves_;
   bool restartConfirmOpen_ = false;
+  bool windowSizeDialogOpen_ = false;
 
   void updateSelection(Position pos);
   void clearSelection();

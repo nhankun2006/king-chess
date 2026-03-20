@@ -24,18 +24,55 @@ void ChessController::run() {
           restartConfirmOpen_ = false;
         }
         view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                         restartConfirmOpen_);
+                         restartConfirmOpen_, windowSizeDialogOpen_);
+        continue;
+      }
+
+      if (windowSizeDialogOpen_) {
+        if (view_->isWindowSizeDialogCloseClicked(mousePos.x, mousePos.y)) {
+          windowSizeDialogOpen_ = false;
+        } else {
+          const auto selectedSizeOpt =
+              view_->getWindowSizeOptionClicked(mousePos.x, mousePos.y);
+          if (selectedSizeOpt.has_value()) {
+            switch (*selectedSizeOpt) {
+            case 0:
+              SetWindowSize(700, 512);
+              break;
+            case 1:
+              SetWindowSize(900, 650);
+              break;
+            case 2:
+              SetWindowSize(1100, 780);
+              break;
+            default:
+              break;
+            }
+            windowSizeDialogOpen_ = false;
+          }
+        }
+
+        view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                         restartConfirmOpen_, windowSizeDialogOpen_);
         continue;
       }
 
       bool handledUiClick = false;
 
-      if (view_->isRotateButtonClicked(mousePos.x, mousePos.y)) {
+      if (view_->isSettingsButtonClicked(mousePos.x, mousePos.y)) {
+        windowSizeDialogOpen_ = true;
+        handledUiClick = true;
+      }
+
+      if (!handledUiClick &&
+          view_->isRotateButtonClicked(mousePos.x, mousePos.y)) {
         view_->toggleBoardOrientation();
         handledUiClick = true;
       }
 
-      if (!handledUiClick && view_->isRestartButtonClicked(mousePos.x, mousePos.y)) {
+      if (!handledUiClick &&
+          view_->isRestartButtonClicked(mousePos.x, mousePos.y)) {
+        windowSizeDialogOpen_ = false;
         restartConfirmOpen_ = true;
         handledUiClick = true;
       }
@@ -79,6 +116,6 @@ void ChessController::run() {
     }
 
     view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                     restartConfirmOpen_);
+                     restartConfirmOpen_, windowSizeDialogOpen_);
   }
 }
