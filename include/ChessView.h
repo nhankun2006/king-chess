@@ -1,6 +1,7 @@
 #ifndef CHESSVIEW_H
 #define CHESSVIEW_H
 
+#include <cmath>
 #include <map>
 #include <optional>
 #include <string>
@@ -26,13 +27,15 @@ private:
   Texture2D settingIconTexture_{};
   Texture2D rotateIconTexture_{};
   Texture2D restartIconTexture_{};
+  Texture2D burningLoopTexture_{};
+  Texture2D burningLoop2Texture_{};
   std::map<PieceType, Texture2D> whiteTextures_;
   std::map<PieceType, Texture2D> blackTextures_;
   std::map<PieceType, Rectangle> whiteSourceRects_;
   std::map<PieceType, Rectangle> blackSourceRects_;
   std::map<PieceType, float> whiteCenterOffsetX_;
   std::map<PieceType, float> blackCenterOffsetX_;
-  bool isBoardFlipped_ = false;
+  bool isBoardFlipped_ = true;
   std::string lastAssetError_;
 
   Rectangle getBoardRenderRect() const;
@@ -48,8 +51,41 @@ private:
   Rectangle getWindowSizeDialogRect() const;
   Rectangle getWindowSizeOptionRect(int index) const;
   Rectangle getWindowSizeCloseButtonRect() const;
+  Rectangle getPromotionDialogRect() const;
+  Rectangle getPromotionOptionRect(int index) const;
 
 public:
+  struct CastlingTween {
+    ::Color color = ::Color::White;
+    Position kingFrom{};
+    Position kingTo{};
+    Position rookFrom{};
+    Position rookTo{};
+    float progress = 1.0f;
+  };
+
+  struct DragPreview {
+    PieceType type = PieceType::None;
+    ::Color color = ::Color::White;
+    Position from{};
+    Vector2 mousePos{0.0f, 0.0f};
+  };
+
+  struct PromotionPrompt {
+    ::Color color = ::Color::White;
+  };
+
+  struct BurningPieceInfo {
+    Position pos{};
+    int captureCount = 0;
+  };
+
+  struct CaptureCounterPopup {
+    Position pos{};
+    int captureCount = 0;
+    float progress = 0.0f;
+  };
+
   ChessView() = default;
   ~ChessView();
 
@@ -63,14 +99,22 @@ public:
   bool isRestartConfirmNoClicked(float x, float y) const;
   std::optional<int> getWindowSizeOptionClicked(float x, float y) const;
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
+  std::optional<PieceType> getPromotionOptionClicked(float x, float y) const;
   std::optional<Position> screenToBoardSquare(float x, float y) const;
   void drawPiece(PieceType type, ::Color color, float x, float y, float w,
-                 float h);
-  void drawBoard(const Board &board,
-                 const std::optional<Position> &selectedSquare = std::nullopt,
-                 const std::vector<Move> &legalMoves = {},
-                 bool showRestartConfirm = false,
-                 bool showWindowSizeDialog = false);
+                 float h, float sizeMultiplier = 1.0f);
+  void drawBoard(
+      const Board &board,
+      const std::optional<Position> &selectedSquare = std::nullopt,
+      const std::vector<Move> &legalMoves = {}, bool showRestartConfirm = false,
+      bool showWindowSizeDialog = false,
+      const std::optional<CastlingTween> &castlingTween = std::nullopt,
+      const std::optional<DragPreview> &dragPreview = std::nullopt,
+      const std::optional<PromotionPrompt> &promotionPrompt = std::nullopt,
+      const std::optional<Position> &invalidHighlightSquare = std::nullopt,
+      const std::vector<BurningPieceInfo> &burningPieces = {},
+      const std::optional<CaptureCounterPopup> &captureCounterPopup =
+          std::nullopt);
 
   void onMoveMade(Position from, Position to) override {
     (void)from;
