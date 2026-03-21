@@ -15,6 +15,8 @@ void ChessController::run() {
   bool pieceMoveSoundLoaded = false;
   Sound captureSound{};
   bool captureSoundLoaded = false;
+  constexpr float kMoveSoundVolume = 0.62f;
+  constexpr float kCaptureSoundVolume = 5.00f;
 
   const char *appDir = GetApplicationDirectory();
   const std::vector<std::string> soundCandidates = {
@@ -33,6 +35,7 @@ void ChessController::run() {
     }
     pieceMoveSound = LoadSound(path.c_str());
     if (pieceMoveSound.frameCount > 0) {
+      SetSoundVolume(pieceMoveSound, kMoveSoundVolume);
       pieceMoveSoundLoaded = true;
       break;
     }
@@ -54,6 +57,7 @@ void ChessController::run() {
     }
     captureSound = LoadSound(path.c_str());
     if (captureSound.frameCount > 0) {
+      SetSoundVolume(captureSound, kCaptureSoundVolume);
       captureSoundLoaded = true;
       break;
     }
@@ -204,8 +208,15 @@ void ChessController::run() {
       }
     }
 
+    const GameState gameState = game_->getState();
+    std::optional<Color> winnerColor;
+    if (gameState == GameState::Checkmate) {
+      winnerColor = oppositeColor(game_->getCurrentTurn());
+    }
+
     view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
                      restartConfirmOpen_, windowSizeDialogOpen_,
+                     gameState, winnerColor,
                      getActiveCastlingTween(), dragPreview, promotionPrompt,
                      invalidHighlight, burningPieces,
                      captureCounterPopup);
