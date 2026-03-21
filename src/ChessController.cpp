@@ -11,6 +11,30 @@ void ChessController::clearSelection() {
 }
 
 void ChessController::run() {
+  auto getActiveCastlingTween = [&]() -> std::optional<ChessView::CastlingTween> {
+    if (!castlingTween_.has_value()) {
+      return std::nullopt;
+    }
+
+    ChessView::CastlingTween tween = *castlingTween_;
+    const double elapsed = GetTime() - castlingTweenStartTime_;
+    tween.progress = static_cast<float>(elapsed / castlingTweenDurationSeconds_);
+    if (tween.progress >= 1.0f) {
+      castlingTween_.reset();
+      return std::nullopt;
+    }
+    if (tween.progress < 0.0f) {
+      tween.progress = 0.0f;
+    }
+    return tween;
+  };
+
+  auto drawFrame = [&]() {
+    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                     restartConfirmOpen_, windowSizeDialogOpen_,
+                     getActiveCastlingTween());
+  };
+
   while (!WindowShouldClose()) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       const Vector2 mousePos = GetMousePosition();
@@ -23,8 +47,7 @@ void ChessController::run() {
         } else if (view_->isRestartConfirmNoClicked(mousePos.x, mousePos.y)) {
           restartConfirmOpen_ = false;
         }
-        view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                         restartConfirmOpen_, windowSizeDialogOpen_);
+        drawFrame();
         continue;
       }
 
@@ -45,6 +68,9 @@ void ChessController::run() {
             case 2:
               SetWindowSize(1100, 780);
               break;
+            case 3:
+              SetWindowSize(1300, 920);
+              break;
             default:
               break;
             }
@@ -52,8 +78,7 @@ void ChessController::run() {
           }
         }
 
-        view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                         restartConfirmOpen_, windowSizeDialogOpen_);
+        drawFrame();
         continue;
       }
 
@@ -90,19 +115,53 @@ void ChessController::run() {
             updateSelection(clickedSquare);
           }
         } else {
-          Move attemptedMove{*selectedSquare_, clickedSquare};
           const Piece *selectedPiece = game_->getBoard().getPieceAt(*selectedSquare_);
+          std::optional<Move> attemptedMove;
 
-          if (selectedPiece && selectedPiece->getType() == PieceType::Pawn) {
-            if ((selectedPiece->getColor() == Color::White &&
-                 clickedSquare.row == 7) ||
-                (selectedPiece->getColor() == Color::Black &&
-                 clickedSquare.row == 0)) {
-              attemptedMove.promotion = PieceType::Queen;
+          const bool isPromotionSquare =
+              selectedPiece && selectedPiece->getType() == PieceType::Pawn &&
+              ((selectedPiece->getColor() == Color::White && clickedSquare.row == 7) ||
+               (selectedPiece->getColor() == Color::Black && clickedSquare.row == 0));
+
+          for (const auto &legalMove : selectedLegalMoves_) {
+            if (legalMove.to != clickedSquare) {
+              continue;
+            }
+
+            if (isPromotionSquare) {
+              if (legalMove.promotion == PieceType::Queen) {
+                attemptedMove = legalMove;
+                break;
+              }
+              if (!attemptedMove.has_value()) {
+                attemptedMove = legalMove;
+              }
+            } else {
+              if (legalMove.promotion == PieceType::None) {
+                attemptedMove = legalMove;
+                break;
+              }
+              if (!attemptedMove.has_value()) {
+                attemptedMove = legalMove;
+              }
             }
           }
 
-          if (game_->makeMove(attemptedMove)) {
+          if (attemptedMove.has_value() && game_->makeMove(*attemptedMove)) {
+            if (attemptedMove->isCastling && selectedPiece != nullptr &&
+                selectedPiece->getType() == PieceType::King) {
+              ChessView::CastlingTween tween;
+              tween.color = selectedPiece->getColor();
+              tween.kingFrom = attemptedMove->from;
+              tween.kingTo = attemptedMove->to;
+              const int rookFromCol = (attemptedMove->to.col == 6) ? 7 : 0;
+              const int rookToCol = (attemptedMove->to.col == 6) ? 5 : 3;
+              tween.rookFrom = {attemptedMove->from.row, rookFromCol};
+              tween.rookTo = {attemptedMove->from.row, rookToCol};
+              tween.progress = 0.0f;
+              castlingTween_ = tween;
+              castlingTweenStartTime_ = GetTime();
+            }
             clearSelection();
           } else if (clickedPiece &&
                      clickedPiece->getColor() == game_->getCurrentTurn()) {
@@ -115,7 +174,6 @@ void ChessController::run() {
       }
     }
 
-    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                     restartConfirmOpen_, windowSizeDialogOpen_);
+    drawFrame();
   }
 }

@@ -32,7 +32,7 @@ private:
   std::map<PieceType, Rectangle> blackSourceRects_;
   std::map<PieceType, float> whiteCenterOffsetX_;
   std::map<PieceType, float> blackCenterOffsetX_;
-  bool isBoardFlipped_ = false;
+  bool isBoardFlipped_ = true;
   std::string lastAssetError_;
 
   Rectangle getBoardRenderRect() const;
@@ -50,6 +50,15 @@ private:
   Rectangle getWindowSizeCloseButtonRect() const;
 
 public:
+  struct CastlingTween {
+    ::Color color = ::Color::White;
+    Position kingFrom{};
+    Position kingTo{};
+    Position rookFrom{};
+    Position rookTo{};
+    float progress = 1.0f;
+  };
+
   ChessView() = default;
 
   ~ChessView() {
@@ -90,12 +99,14 @@ public:
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
   std::optional<Position> screenToBoardSquare(float x, float y) const;
   void drawPiece(PieceType type, ::Color color, float x, float y, float w,
-                 float h);
+                 float h, float sizeMultiplier = 1.0f);
   void drawBoard(const Board &board,
                  const std::optional<Position> &selectedSquare = std::nullopt,
                  const std::vector<Move> &legalMoves = {},
                  bool showRestartConfirm = false,
-                 bool showWindowSizeDialog = false);
+           bool showWindowSizeDialog = false,
+           const std::optional<CastlingTween> &castlingTween =
+             std::nullopt);
 
   void onMoveMade(Position from, Position to) override {
     (void)from;
@@ -310,7 +321,7 @@ inline Rectangle ChessView::getBoardGridRect() const {
   constexpr float kGridLeftPx = 7.0f;
   constexpr float kGridTopPx = 7.0f;
   constexpr float kGridRightPx = 7.0f;
-  constexpr float kGridBottomPx = 8.0f;
+  constexpr float kGridBottomPx = 7.0f;
 
   const float gridWidthPx = kBoardSourceSize - kGridLeftPx - kGridRightPx;
   const float gridHeightPx = kBoardSourceSize - kGridTopPx - kGridBottomPx;
@@ -418,7 +429,7 @@ inline Rectangle ChessView::getRestartConfirmNoButtonRect() const {
 inline Rectangle ChessView::getWindowSizeDialogRect() const {
   const float uiScale = getUiScale();
   float dialogWidth = 340.0f * uiScale;
-  const float dialogHeight = 220.0f * uiScale;
+  const float dialogHeight = 270.0f * uiScale;
   const float maxWidth = static_cast<float>(GetScreenWidth()) - 40.0f;
   if (dialogWidth > maxWidth) {
     dialogWidth = maxWidth;
@@ -480,7 +491,7 @@ inline bool ChessView::isRestartButtonClicked(float x, float y) const {
 
 inline std::optional<int> ChessView::getWindowSizeOptionClicked(float x,
                                                                 float y) const {
-  for (int index = 0; index < 3; ++index) {
+  for (int index = 0; index < 4; ++index) {
     const Rectangle option = getWindowSizeOptionRect(index);
     if (x >= option.x && x <= option.x + option.width && y >= option.y &&
         y <= option.y + option.height) {
@@ -522,7 +533,7 @@ inline std::optional<Position> ChessView::screenToBoardSquare(float x,
   const int displayCol = static_cast<int>((x - grid.x) / cellW);
   const int displayRow = static_cast<int>((y - grid.y) / cellH);
 
-  const int col = isBoardFlipped_ ? (7 - displayCol) : displayCol;
+  const int col = displayCol;
   const int row = isBoardFlipped_ ? (7 - displayRow) : displayRow;
 
   return Position{row, col};
@@ -530,7 +541,7 @@ inline std::optional<Position> ChessView::screenToBoardSquare(float x,
 
 inline void ChessView::drawPiece(PieceType type, ::Color color, float x,
                                  float y,
-                                 float w, float h) {
+                                 float w, float h, float sizeMultiplier) {
   const auto &textures =
       (color == ::Color::White) ? whiteTextures_ : blackTextures_;
   const auto &sourceRects =
@@ -554,10 +565,10 @@ inline void ChessView::drawPiece(PieceType type, ::Color color, float x,
   const float scale = (w / src.width < h / src.height) ? (w / src.width)
                                                         : (h / src.height);
   constexpr float kPieceSizeFactor = 0.70f;
-  const float dstWidth = src.width * scale * kPieceSizeFactor;
-  const float dstHeight = src.height * scale * kPieceSizeFactor;
+  const float dstWidth = src.width * scale * kPieceSizeFactor * sizeMultiplier;
+  const float dstHeight = src.height * scale * kPieceSizeFactor * sizeMultiplier;
   constexpr float kPieceOffsetX = 0.0f;
-  constexpr float kPieceBottomPadding = 3.0f;
+  constexpr float kPieceBottomPadding = 4.0f;
   float autoCenterOffsetX = 0.0f;
   const auto centerOffsetIt = centerOffsets.find(type);
   if (centerOffsetIt != centerOffsets.end()) {
@@ -575,7 +586,9 @@ inline void ChessView::drawBoard(const Board &board,
                                  const std::optional<Position> &selectedSquare,
                                  const std::vector<Move> &legalMoves,
                                  bool showRestartConfirm,
-                                 bool showWindowSizeDialog) {
+                 bool showWindowSizeDialog,
+                 const std::optional<CastlingTween>
+                   &castlingTween) {
   BeginDrawing();
   ClearBackground({0, 0, 0, 255});
 
@@ -583,9 +596,8 @@ inline void ChessView::drawBoard(const Board &board,
     Rectangle src = {0.0f, 0.0f, static_cast<float>(boardTexture_.width),
                      static_cast<float>(boardTexture_.height)};
     if (isBoardFlipped_) {
-      src = {static_cast<float>(boardTexture_.width),
-             static_cast<float>(boardTexture_.height),
-             -static_cast<float>(boardTexture_.width),
+      src = {0.0f, static_cast<float>(boardTexture_.height),
+             static_cast<float>(boardTexture_.width),
              -static_cast<float>(boardTexture_.height)};
     }
     const Rectangle dst = getBoardRenderRect();
@@ -596,10 +608,27 @@ inline void ChessView::drawBoard(const Board &board,
   const Rectangle grid = getBoardGridRect();
   const float cellW = grid.width / 8.0f;
   const float cellH = grid.height / 8.0f;
+  const bool hasActiveCastlingTween =
+      castlingTween.has_value() && castlingTween->progress < 1.0f;
+
+  auto getDisplayRow = [&](int boardRow) -> int {
+    return isBoardFlipped_ ? (7 - boardRow) : boardRow;
+  };
+
+  auto getBoardPieceScale = [](PieceType type) -> float {
+    switch (type) {
+    case PieceType::King:
+    case PieceType::Queen:
+    case PieceType::Bishop:
+      return 1.12f;
+    default:
+      return 1.0f;
+    }
+  };
 
   for (const auto &move : legalMoves) {
-    const int displayCol = isBoardFlipped_ ? (7 - move.to.col) : move.to.col;
-    const int displayRow = isBoardFlipped_ ? (7 - move.to.row) : move.to.row;
+    const int displayCol = move.to.col;
+    const int displayRow = getDisplayRow(move.to.row);
     DrawRectangleRec(
         {grid.x + static_cast<float>(displayCol) * cellW,
          grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
@@ -610,21 +639,71 @@ inline void ChessView::drawBoard(const Board &board,
     for (int col = 0; col < 8; ++col) {
       const Piece *piece = board.getPieceAt({row, col});
       if (piece) {
-        const int displayCol = isBoardFlipped_ ? (7 - col) : col;
-        const int displayRow = isBoardFlipped_ ? (7 - row) : row;
+        if (hasActiveCastlingTween &&
+            piece->getColor() == castlingTween->color &&
+            ((piece->getType() == PieceType::King &&
+              row == castlingTween->kingTo.row &&
+              col == castlingTween->kingTo.col) ||
+             (piece->getType() == PieceType::Rook &&
+              row == castlingTween->rookTo.row &&
+              col == castlingTween->rookTo.col))) {
+          continue;
+        }
+
+        const int displayCol = col;
+        const int displayRow = getDisplayRow(row);
+        const float boardPieceScale = getBoardPieceScale(piece->getType());
         drawPiece(piece->getType(), piece->getColor(),
                   grid.x + static_cast<float>(displayCol) * cellW,
                   grid.y + static_cast<float>(displayRow) * cellH, cellW,
-                  cellH);
+                  cellH, boardPieceScale);
       }
     }
   }
 
+  if (hasActiveCastlingTween) {
+    float progress = castlingTween->progress;
+    if (progress < 0.0f) {
+      progress = 0.0f;
+    }
+    if (progress > 1.0f) {
+      progress = 1.0f;
+    }
+
+    const float kingStartX =
+        grid.x + static_cast<float>(castlingTween->kingFrom.col) * cellW;
+    const float kingStartY =
+        grid.y + static_cast<float>(getDisplayRow(castlingTween->kingFrom.row)) *
+                     cellH;
+    const float kingEndX =
+        grid.x + static_cast<float>(castlingTween->kingTo.col) * cellW;
+    const float kingEndY =
+        grid.y + static_cast<float>(getDisplayRow(castlingTween->kingTo.row)) *
+                     cellH;
+    const float kingX = kingStartX + (kingEndX - kingStartX) * progress;
+    const float kingY = kingStartY + (kingEndY - kingStartY) * progress;
+    drawPiece(PieceType::King, castlingTween->color, kingX, kingY, cellW, cellH,
+              getBoardPieceScale(PieceType::King));
+
+    const float rookStartX =
+        grid.x + static_cast<float>(castlingTween->rookFrom.col) * cellW;
+    const float rookStartY =
+        grid.y + static_cast<float>(getDisplayRow(castlingTween->rookFrom.row)) *
+                     cellH;
+    const float rookEndX =
+        grid.x + static_cast<float>(castlingTween->rookTo.col) * cellW;
+    const float rookEndY =
+        grid.y + static_cast<float>(getDisplayRow(castlingTween->rookTo.row)) *
+                     cellH;
+    const float rookX = rookStartX + (rookEndX - rookStartX) * progress;
+    const float rookY = rookStartY + (rookEndY - rookStartY) * progress;
+    drawPiece(PieceType::Rook, castlingTween->color, rookX, rookY, cellW, cellH,
+              getBoardPieceScale(PieceType::Rook));
+  }
+
   if (selectedSquare.has_value()) {
-    const int displayCol =
-        isBoardFlipped_ ? (7 - selectedSquare->col) : selectedSquare->col;
-    const int displayRow =
-        isBoardFlipped_ ? (7 - selectedSquare->row) : selectedSquare->row;
+    const int displayCol = selectedSquare->col;
+    const int displayRow = getDisplayRow(selectedSquare->row);
     DrawRectangleLinesEx(
         {grid.x + static_cast<float>(displayCol) * cellW,
          grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
@@ -690,26 +769,50 @@ inline void ChessView::drawBoard(const Board &board,
                                  const std::map<PieceType, int> &captured)
       -> int {
     const float uiScale = getUiScale();
-    const int titleFontSize = static_cast<int>(20.0f * uiScale);
+    float capturedScale = getBoardRenderRect().width / 512.0f;
+    if (capturedScale < 0.95f) {
+      capturedScale = 0.95f;
+    }
+    if (capturedScale > 2.60f) {
+      capturedScale = 2.60f;
+    }
+    const int titleFontSize = static_cast<int>(22.0f * capturedScale);
     DrawText(title, sectionX + static_cast<int>(12.0f * uiScale),
              sectionY + static_cast<int>(8.0f * uiScale), titleFontSize,
              {235, 235, 235, 255});
 
-    const float iconW = 24.0f * uiScale;
-    const float iconH = 24.0f * uiScale;
-    const float gap = 4.0f * uiScale;
+    const bool compactColumns = GetScreenWidth() <= 700;
+    const float iconW = (compactColumns ? 32.0f : 36.0f) * capturedScale;
+    const float iconH = (compactColumns ? 32.0f : 36.0f) * capturedScale;
+    const float gap = (compactColumns ? 6.0f : 7.0f) * capturedScale;
     const int maxPerRow =
         (sectionWidth - static_cast<int>(20.0f * uiScale)) /
         static_cast<int>(iconW + gap);
     const int safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
     float iconX = static_cast<float>(sectionX) + 10.0f * uiScale;
-    float iconY = static_cast<float>(sectionY) + 36.0f * uiScale;
+    float iconY = static_cast<float>(sectionY) + 46.0f * uiScale;
     int drawn = 0;
+
+    auto getCapturedPieceSizeFactor = [](PieceType type) -> float {
+      switch (type) {
+      case PieceType::King:
+      case PieceType::Queen:
+      case PieceType::Bishop:
+        return 1.15f;
+      default:
+        return 1.0f;
+      }
+    };
 
     for (const PieceType type : pieceOrder) {
       const int count = captured.at(type);
       for (int index = 0; index < count; ++index) {
-        drawPiece(type, capturedColor, iconX, iconY, iconW, iconH);
+        const float pieceFactor = getCapturedPieceSizeFactor(type);
+        const float drawW = iconW * pieceFactor;
+        const float drawH = iconH * pieceFactor;
+        const float drawX = iconX + (iconW - drawW) * 0.5f;
+        const float drawY = iconY + (iconH - drawH) * 0.5f;
+        drawPiece(type, capturedColor, drawX, drawY, drawW, drawH);
         drawn += 1;
         if (drawn % safeMaxPerRow == 0) {
           iconX = static_cast<float>(sectionX) + 10.0f * uiScale;
@@ -722,13 +825,13 @@ inline void ChessView::drawBoard(const Board &board,
 
     if (drawn == 0) {
       DrawText("-", sectionX + static_cast<int>(14.0f * uiScale),
-               sectionY + static_cast<int>(38.0f * uiScale),
-               static_cast<int>(24.0f * uiScale), {180, 180, 180, 255});
-      return static_cast<int>(68.0f * uiScale);
+               sectionY + static_cast<int>(46.0f * uiScale),
+               static_cast<int>(32.0f * capturedScale), {180, 180, 180, 255});
+      return static_cast<int>(86.0f * uiScale);
     }
 
     const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
-    return static_cast<int>(40.0f * uiScale) +
+    return static_cast<int>(52.0f * uiScale) +
            rows * static_cast<int>(iconH + gap);
   };
 
@@ -736,9 +839,17 @@ inline void ChessView::drawBoard(const Board &board,
                                       const std::map<PieceType, int> &captured)
       -> int {
     const float uiScale = getUiScale();
-    const float iconW = 24.0f * uiScale;
-    const float iconH = 24.0f * uiScale;
-    const float gap = 4.0f * uiScale;
+    float capturedScale = getBoardRenderRect().width / 512.0f;
+    if (capturedScale < 0.95f) {
+      capturedScale = 0.95f;
+    }
+    if (capturedScale > 2.60f) {
+      capturedScale = 2.60f;
+    }
+    const bool compactColumns = GetScreenWidth() <= 700;
+    const float iconW = (compactColumns ? 32.0f : 36.0f) * capturedScale;
+    const float iconH = (compactColumns ? 32.0f : 36.0f) * capturedScale;
+    const float gap = (compactColumns ? 6.0f : 7.0f) * capturedScale;
     const int maxPerRow =
         (sectionWidth - static_cast<int>(20.0f * uiScale)) /
         static_cast<int>(iconW + gap);
@@ -750,11 +861,11 @@ inline void ChessView::drawBoard(const Board &board,
     }
 
     if (drawn == 0) {
-      return static_cast<int>(68.0f * uiScale);
+      return static_cast<int>(86.0f * uiScale);
     }
 
     const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
-    return static_cast<int>(40.0f * uiScale) +
+    return static_cast<int>(52.0f * uiScale) +
            rows * static_cast<int>(iconH + gap);
   };
 
@@ -883,23 +994,36 @@ inline void ChessView::drawBoard(const Board &board,
       drawCenteredHoverText(settingsButton, "Window size");
     }
 
-    const int whiteSectionY = 8;
-    const int whiteSectionBottom =
-        whiteSectionY + drawCapturedSection(rightPanelX, whiteSectionY,
-                                            rightPanelWidth, "White captured",
-                                            ::Color::Black,
-                                            capturedBlackPieces);
+    const bool swapCapturedSections = isBoardFlipped_;
+    const char *topTitle = swapCapturedSections ? "Black captured"
+                          : "White captured";
+    const ::Color topPieceColor =
+      swapCapturedSections ? ::Color::White : ::Color::Black;
+    const std::map<PieceType, int> &topCaptured =
+      swapCapturedSections ? capturedWhitePieces : capturedBlackPieces;
 
-    const int blackSectionHeight =
-        getCapturedSectionHeight(rightPanelWidth, capturedWhitePieces);
-    int blackSectionY = rightPanelHeight - 8 - blackSectionHeight;
-    if (blackSectionY < whiteSectionBottom + 12) {
-      blackSectionY = whiteSectionBottom + 12;
+    const char *bottomTitle = swapCapturedSections ? "White captured"
+                             : "Black captured";
+    const ::Color bottomPieceColor =
+      swapCapturedSections ? ::Color::Black : ::Color::White;
+    const std::map<PieceType, int> &bottomCaptured =
+      swapCapturedSections ? capturedBlackPieces : capturedWhitePieces;
+
+    const int topSectionY = 8;
+    const int topSectionBottom =
+      topSectionY + drawCapturedSection(rightPanelX, topSectionY,
+                        rightPanelWidth, topTitle,
+                        topPieceColor, topCaptured);
+
+    const int bottomSectionHeight =
+      getCapturedSectionHeight(rightPanelWidth, bottomCaptured);
+    int bottomSectionY = rightPanelHeight - 8 - bottomSectionHeight;
+    if (bottomSectionY < topSectionBottom + 12) {
+      bottomSectionY = topSectionBottom + 12;
     }
 
-    drawCapturedSection(rightPanelX, blackSectionY, rightPanelWidth,
-                        "Black captured", ::Color::White,
-                        capturedWhitePieces);
+    drawCapturedSection(rightPanelX, bottomSectionY, rightPanelWidth,
+              bottomTitle, bottomPieceColor, bottomCaptured);
   }
 
   if (showRestartConfirm) {
@@ -994,8 +1118,9 @@ inline void ChessView::drawBoard(const Board &board,
              static_cast<int>(dialog.y + 16.0f * uiScale), titleFontSize,
              {235, 235, 235, 255});
 
-    const char *sizeLabels[3] = {"700 x 512", "900 x 650", "1100 x 780"};
-    for (int index = 0; index < 3; ++index) {
+    const char *sizeLabels[4] = {"700 x 512", "900 x 650", "1100 x 780",
+                                 "1300 x 920"};
+    for (int index = 0; index < 4; ++index) {
       const Rectangle optionRect = getWindowSizeOptionRect(index);
       const bool hovered = CheckCollisionPointRec(mousePos, optionRect);
 

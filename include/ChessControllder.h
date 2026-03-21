@@ -15,6 +15,9 @@ private:
   std::vector<Move> selectedLegalMoves_;
   bool restartConfirmOpen_ = false;
   bool windowSizeDialogOpen_ = false;
+  std::optional<ChessView::CastlingTween> castlingTween_;
+  double castlingTweenStartTime_ = 0.0;
+  float castlingTweenDurationSeconds_ = 0.22f;
 
   void updateSelection(Position pos);
   void clearSelection();
