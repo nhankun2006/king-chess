@@ -1,7 +1,6 @@
 #ifndef CHESSVIEW_H
 #define CHESSVIEW_H
 
-#include <cmath>
 #include <map>
 #include <optional>
 #include <string>
