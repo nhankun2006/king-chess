@@ -10,16 +10,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Raylib dependency resolution:
-# - Windows: use CMake config package (vcpkg-friendly)
-# - Non-Windows: prefer CMake config package, fallback to pkg-config
+# - Windows: vcpkg manifest mode fetches raylib automatically
+# - Linux:   find_package or pkg-config (install raylib-devel manually)
 if(WIN32)
     find_package(raylib CONFIG REQUIRED)
     set(RAYLIB_TARGET raylib)
 else()
     find_package(raylib QUIET)
-    if(TARGET raylib)
+    if(raylib_FOUND AND TARGET raylib)
         set(RAYLIB_TARGET raylib)
-    elseif(TARGET raylib::raylib)
+    elseif(raylib_FOUND AND TARGET raylib::raylib)
         set(RAYLIB_TARGET raylib::raylib)
     else()
         find_package(PkgConfig REQUIRED)
