@@ -1,6 +1,7 @@
 #ifndef CHESSVIEW_H
 #define CHESSVIEW_H
 
+#include <cmath>
 #include <map>
 #include <optional>
 #include <string>
@@ -26,6 +27,8 @@ private:
   Texture2D settingIconTexture_{};
   Texture2D rotateIconTexture_{};
   Texture2D restartIconTexture_{};
+  Texture2D burningLoopTexture_{};
+  Texture2D burningLoop2Texture_{};
   std::map<PieceType, Texture2D> whiteTextures_;
   std::map<PieceType, Texture2D> blackTextures_;
   std::map<PieceType, Rectangle> whiteSourceRects_;
@@ -48,6 +51,8 @@ private:
   Rectangle getWindowSizeDialogRect() const;
   Rectangle getWindowSizeOptionRect(int index) const;
   Rectangle getWindowSizeCloseButtonRect() const;
+  Rectangle getPromotionDialogRect() const;
+  Rectangle getPromotionOptionRect(int index) const;
 
 public:
   struct CastlingTween {
@@ -57,6 +62,28 @@ public:
     Position rookFrom{};
     Position rookTo{};
     float progress = 1.0f;
+  };
+
+  struct DragPreview {
+    PieceType type = PieceType::None;
+    ::Color color = ::Color::White;
+    Position from{};
+    Vector2 mousePos{0.0f, 0.0f};
+  };
+
+  struct PromotionPrompt {
+    ::Color color = ::Color::White;
+  };
+
+  struct BurningPieceInfo {
+    Position pos{};
+    int captureCount = 0;
+  };
+
+  struct CaptureCounterPopup {
+    Position pos{};
+    int captureCount = 0;
+    float progress = 0.0f;
   };
 
   ChessView() = default;
@@ -73,6 +100,12 @@ public:
     }
     if (restartIconTexture_.id != 0) {
       UnloadTexture(restartIconTexture_);
+    }
+    if (burningLoopTexture_.id != 0) {
+      UnloadTexture(burningLoopTexture_);
+    }
+    if (burningLoop2Texture_.id != 0) {
+      UnloadTexture(burningLoop2Texture_);
     }
 
     for (auto &entry : whiteTextures_) {
@@ -97,6 +130,7 @@ public:
   bool isRestartConfirmNoClicked(float x, float y) const;
   std::optional<int> getWindowSizeOptionClicked(float x, float y) const;
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
+  std::optional<PieceType> getPromotionOptionClicked(float x, float y) const;
   std::optional<Position> screenToBoardSquare(float x, float y) const;
   void drawPiece(PieceType type, ::Color color, float x, float y, float w,
                  float h, float sizeMultiplier = 1.0f);
@@ -106,6 +140,15 @@ public:
                  bool showRestartConfirm = false,
            bool showWindowSizeDialog = false,
            const std::optional<CastlingTween> &castlingTween =
+             std::nullopt,
+           const std::optional<DragPreview> &dragPreview =
+             std::nullopt,
+           const std::optional<PromotionPrompt> &promotionPrompt =
+             std::nullopt,
+           const std::optional<Position> &invalidHighlightSquare =
+             std::nullopt,
+           const std::vector<BurningPieceInfo> &burningPieces = {},
+           const std::optional<CaptureCounterPopup> &captureCounterPopup =
              std::nullopt);
 
   void onMoveMade(Position from, Position to) override {
@@ -135,6 +178,14 @@ inline bool ChessView::LoadAssets() {
   if (restartIconTexture_.id != 0) {
     UnloadTexture(restartIconTexture_);
     restartIconTexture_ = {};
+  }
+  if (burningLoopTexture_.id != 0) {
+    UnloadTexture(burningLoopTexture_);
+    burningLoopTexture_ = {};
+  }
+  if (burningLoop2Texture_.id != 0) {
+    UnloadTexture(burningLoop2Texture_);
+    burningLoop2Texture_ = {};
   }
   whiteSourceRects_.clear();
   blackSourceRects_.clear();
@@ -269,6 +320,8 @@ inline bool ChessView::LoadAssets() {
   loadTextureWithFallback("setting_feature.png", settingIconTexture_);
   loadTextureWithFallback("rotate_feature.png", rotateIconTexture_);
   loadTextureWithFallback("restart_feature.png", restartIconTexture_);
+  loadTextureWithFallback("burning_loop_1.png", burningLoopTexture_);
+  loadTextureWithFallback("burning_loop_2.png", burningLoop2Texture_);
 
   static const std::pair<PieceType, std::string> pieces[] = {
       {PieceType::Pawn, "Pawn"},     {PieceType::Knight, "Knight"},
@@ -459,6 +512,31 @@ inline Rectangle ChessView::getWindowSizeCloseButtonRect() const {
           dialog.y + 10.0f * uiScale, buttonSize, buttonSize};
 }
 
+inline Rectangle ChessView::getPromotionDialogRect() const {
+  const float uiScale = getUiScale();
+  float dialogWidth = 320.0f * uiScale;
+  const float dialogHeight = 130.0f * uiScale;
+  const float maxWidth = static_cast<float>(GetScreenWidth()) - 40.0f;
+  if (dialogWidth > maxWidth) {
+    dialogWidth = maxWidth;
+  }
+  const float x = (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f;
+  const float y = (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f;
+  return {x, y, dialogWidth, dialogHeight};
+}
+
+inline Rectangle ChessView::getPromotionOptionRect(int index) const {
+  const Rectangle dialog = getPromotionDialogRect();
+  const float uiScale = getUiScale();
+  const float gap = 10.0f * uiScale;
+  const float totalGap = gap * 3.0f;
+  const float buttonSize = (dialog.width - 36.0f * uiScale - totalGap) / 4.0f;
+  const float startX = dialog.x + 18.0f * uiScale;
+  const float y = dialog.y + 52.0f * uiScale;
+  return {startX + static_cast<float>(index) * (buttonSize + gap), y,
+          buttonSize, buttonSize};
+}
+
 inline bool ChessView::isSettingsButtonClicked(float x, float y) const {
   const Rectangle settingsButton = getSettingsButtonRect();
   if (settingsButton.width <= 0.0f || settingsButton.height <= 0.0f) {
@@ -506,6 +584,20 @@ inline bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
   const Rectangle closeButton = getWindowSizeCloseButtonRect();
   return x >= closeButton.x && x <= closeButton.x + closeButton.width &&
          y >= closeButton.y && y <= closeButton.y + closeButton.height;
+}
+
+inline std::optional<PieceType> ChessView::getPromotionOptionClicked(float x,
+                                                                      float y) const {
+  const PieceType options[4] = {PieceType::Queen, PieceType::Rook,
+                                PieceType::Bishop, PieceType::Knight};
+  for (int index = 0; index < 4; ++index) {
+    const Rectangle option = getPromotionOptionRect(index);
+    if (x >= option.x && x <= option.x + option.width && y >= option.y &&
+        y <= option.y + option.height) {
+      return options[index];
+    }
+  }
+  return std::nullopt;
 }
 
 inline bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
@@ -588,7 +680,14 @@ inline void ChessView::drawBoard(const Board &board,
                                  bool showRestartConfirm,
                  bool showWindowSizeDialog,
                  const std::optional<CastlingTween>
-                   &castlingTween) {
+                   &castlingTween,
+                 const std::optional<DragPreview> &dragPreview,
+                 const std::optional<PromotionPrompt>
+                   &promotionPrompt,
+                 const std::optional<Position>
+                   &invalidHighlightSquare,
+                 const std::vector<BurningPieceInfo> &burningPieces,
+                 const std::optional<CaptureCounterPopup> &captureCounterPopup) {
   BeginDrawing();
   ClearBackground({0, 0, 0, 255});
 
@@ -610,6 +709,8 @@ inline void ChessView::drawBoard(const Board &board,
   const float cellH = grid.height / 8.0f;
   const bool hasActiveCastlingTween =
       castlingTween.has_value() && castlingTween->progress < 1.0f;
+    const bool hasActiveDragPreview =
+      dragPreview.has_value() && dragPreview->type != PieceType::None;
 
   auto getDisplayRow = [&](int boardRow) -> int {
     return isBoardFlipped_ ? (7 - boardRow) : boardRow;
@@ -626,6 +727,15 @@ inline void ChessView::drawBoard(const Board &board,
     }
   };
 
+  auto getBurningCaptureCount = [&](Position pos) -> int {
+    for (const auto &burningPiece : burningPieces) {
+      if (burningPiece.pos == pos) {
+        return burningPiece.captureCount;
+      }
+    }
+    return 0;
+  };
+
   for (const auto &move : legalMoves) {
     const int displayCol = move.to.col;
     const int displayRow = getDisplayRow(move.to.row);
@@ -635,10 +745,29 @@ inline void ChessView::drawBoard(const Board &board,
         {0, 255, 0, 90});
   }
 
+  if (hasActiveDragPreview) {
+    const float mouseX = dragPreview->mousePos.x;
+    const float mouseY = dragPreview->mousePos.y;
+    if (mouseX >= grid.x && mouseY >= grid.y && mouseX < grid.x + grid.width &&
+        mouseY < grid.y + grid.height) {
+      const int hoverDisplayCol = static_cast<int>((mouseX - grid.x) / cellW);
+      const int hoverDisplayRow = static_cast<int>((mouseY - grid.y) / cellH);
+      DrawRectangleRec(
+          {grid.x + static_cast<float>(hoverDisplayCol) * cellW,
+           grid.y + static_cast<float>(hoverDisplayRow) * cellH, cellW, cellH},
+          {80, 180, 255, 95});
+    }
+  }
+
   for (int row = 0; row < 8; ++row) {
     for (int col = 0; col < 8; ++col) {
       const Piece *piece = board.getPieceAt({row, col});
       if (piece) {
+        if (hasActiveDragPreview && row == dragPreview->from.row &&
+            col == dragPreview->from.col) {
+          continue;
+        }
+
         if (hasActiveCastlingTween &&
             piece->getColor() == castlingTween->color &&
             ((piece->getType() == PieceType::King &&
@@ -653,12 +782,139 @@ inline void ChessView::drawBoard(const Board &board,
         const int displayCol = col;
         const int displayRow = getDisplayRow(row);
         const float boardPieceScale = getBoardPieceScale(piece->getType());
+
+        const int burningCaptureCount = getBurningCaptureCount({row, col});
+        Texture2D activeBurningTexture = burningLoopTexture_;
+        if (burningCaptureCount >= 6 && burningLoop2Texture_.id != 0) {
+          activeBurningTexture = burningLoop2Texture_;
+        }
+        if (activeBurningTexture.id != 0 && burningCaptureCount >= 2) {
+          constexpr int kBurnFrameCount = 8;
+          int frameCount = kBurnFrameCount;
+          if (activeBurningTexture.width < frameCount) {
+            frameCount = 1;
+          }
+          const int frameWidth = activeBurningTexture.width / frameCount;
+          const int frameHeight = activeBurningTexture.height;
+          const int frameIndex =
+              static_cast<int>(GetTime() * 12.0) % frameCount;
+          int effectiveCaptureCount = burningCaptureCount;
+          if (effectiveCaptureCount > 5) {
+            effectiveCaptureCount = 5;
+          }
+          const int extraCaptures = effectiveCaptureCount - 2;
+          float burnSizeFactor = 1.34f +
+                                 0.16f * static_cast<float>(extraCaptures) +
+                                 0.05f * static_cast<float>(extraCaptures * extraCaptures);
+          if (burnSizeFactor > 2.45f) {
+            burnSizeFactor = 2.45f;
+          }
+          float burnLiftFactor = 0.34f +
+                                 0.04f * static_cast<float>(extraCaptures) +
+                                 0.22f * (burnSizeFactor - 1.30f);
+          if (burnLiftFactor > 0.64f) {
+            burnLiftFactor = 0.64f;
+          }
+          const float effectSize = ((cellW < cellH) ? cellW : cellH) *
+                                   burnSizeFactor;
+          const Rectangle effectSrc = {
+            static_cast<float>(frameIndex * frameWidth), 0.0f,
+            static_cast<float>(frameWidth),
+            static_cast<float>(frameHeight)};
+          const Rectangle effectDst = {
+            grid.x + static_cast<float>(displayCol) * cellW +
+              (cellW - effectSize) * 0.5f,
+            grid.y + static_cast<float>(displayRow) * cellH +
+                (cellH - effectSize) * 0.5f - cellH * burnLiftFactor,
+            effectSize,
+            effectSize};
+          DrawTexturePro(activeBurningTexture, effectSrc, effectDst,
+                         {0.0f, 0.0f}, 0.0f, {255, 255, 255, 195});
+        }
+
         drawPiece(piece->getType(), piece->getColor(),
                   grid.x + static_cast<float>(displayCol) * cellW,
                   grid.y + static_cast<float>(displayRow) * cellH, cellW,
                   cellH, boardPieceScale);
+
       }
     }
+  }
+
+  if (captureCounterPopup.has_value() && captureCounterPopup->captureCount >= 2) {
+    float popupProgress = captureCounterPopup->progress;
+    if (popupProgress < 0.0f) {
+      popupProgress = 0.0f;
+    }
+    if (popupProgress > 1.0f) {
+      popupProgress = 1.0f;
+    }
+
+    const int popupDisplayCol = captureCounterPopup->pos.col;
+    const int popupDisplayRow = getDisplayRow(captureCounterPopup->pos.row);
+    const float squareX = grid.x + static_cast<float>(popupDisplayCol) * cellW;
+    const float squareY = grid.y + static_cast<float>(popupDisplayRow) * cellH;
+
+    int effectiveCaptureCount = captureCounterPopup->captureCount;
+    if (effectiveCaptureCount > 5) {
+      effectiveCaptureCount = 5;
+    }
+    const float intensity =
+      1.0f + 0.22f * static_cast<float>(effectiveCaptureCount - 2);
+    const bool isOverheatTier = captureCounterPopup->captureCount >= 6;
+    const float easeOut = 1.0f - popupProgress;
+    const float burstEase = std::pow(easeOut, 1.35f);
+    const float fadeEase = std::sqrt(easeOut);
+    const float moveEase = 1.0f - (easeOut * easeOut * easeOut);
+    const float scalePulse = 1.0f + (0.52f * intensity) * burstEase;
+    const float floatUp = cellH * (0.22f + 0.04f * intensity) * moveEase;
+    const unsigned char textAlpha =
+      static_cast<unsigned char>(255.0f * fadeEase);
+    const unsigned char boxAlpha =
+      static_cast<unsigned char>((185.0f + 25.0f * intensity) * fadeEase);
+    const float textAlphaNorm = static_cast<float>(textAlpha) / 255.0f;
+
+    float shakeOffsetX = 0.0f;
+    float shakeOffsetY = 0.0f;
+    if (effectiveCaptureCount >= 3) {
+      const float shakeStrength =
+          cellW * 0.045f * static_cast<float>(effectiveCaptureCount - 2) *
+          burstEase;
+      const float shakePhase = static_cast<float>(GetTime() * 62.0);
+      shakeOffsetX = std::sin(shakePhase) * shakeStrength;
+      shakeOffsetY = std::cos(shakePhase * 1.27f) * shakeStrength * 0.30f;
+    }
+
+    const char *popupText = TextFormat("x%d", captureCounterPopup->captureCount);
+    int popupFontSize = static_cast<int>(cellH * (0.27f + 0.02f * intensity) * scalePulse);
+    if (popupFontSize < 14) {
+      popupFontSize = 14;
+    }
+    const int popupTextWidth = MeasureText(popupText, popupFontSize);
+    const float padX = cellW * 0.11f;
+    const float padY = cellH * 0.06f;
+    const float badgeW = static_cast<float>(popupTextWidth) + padX * 2.0f;
+    const float badgeH = static_cast<float>(popupFontSize) + padY * 2.0f;
+    const Rectangle popupBadge = {
+      squareX + cellW - badgeW - cellW * 0.02f + shakeOffsetX,
+      squareY + cellH * 0.02f - floatUp + shakeOffsetY,
+        badgeW,
+        badgeH};
+
+    DrawRectangleRounded(popupBadge, 0.34f, 8, {36, 40, 52, boxAlpha});
+    const auto popupBorderColor =
+      isOverheatTier ? Fade(GetColor(0xFF5F5FFF), textAlphaNorm)
+               : Fade(GetColor(0xFFD278FF), textAlphaNorm);
+    const auto popupTextColor =
+      isOverheatTier ? Fade(GetColor(0xFF7878FF), textAlphaNorm)
+               : Fade(GetColor(0xFFF5BEFF), textAlphaNorm);
+    DrawRectangleRoundedLinesEx(popupBadge, 0.34f, 8, 1.8f,
+                  popupBorderColor);
+    DrawText(popupText,
+             static_cast<int>(popupBadge.x + padX),
+             static_cast<int>(popupBadge.y + padY),
+             popupFontSize,
+         popupTextColor);
   }
 
   if (hasActiveCastlingTween) {
@@ -708,6 +964,23 @@ inline void ChessView::drawBoard(const Board &board,
         {grid.x + static_cast<float>(displayCol) * cellW,
          grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
         3.0f, {255, 255, 0, 255});
+  }
+
+  if (invalidHighlightSquare.has_value()) {
+    const int displayCol = invalidHighlightSquare->col;
+    const int displayRow = getDisplayRow(invalidHighlightSquare->row);
+    const Rectangle invalidRect = {
+        grid.x + static_cast<float>(displayCol) * cellW,
+        grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH};
+    DrawRectangleRec(invalidRect, {220, 50, 50, 85});
+    DrawRectangleLinesEx(invalidRect, 3.0f, {255, 70, 70, 255});
+  }
+
+  if (hasActiveDragPreview) {
+    const float dragX = dragPreview->mousePos.x - cellW * 0.5f;
+    const float dragY = dragPreview->mousePos.y - cellH * 0.5f;
+    drawPiece(dragPreview->type, dragPreview->color, dragX, dragY, cellW,
+              cellH, getBoardPieceScale(dragPreview->type));
   }
 
   auto getInitialCount = [](PieceType type) -> int {
@@ -1161,6 +1434,44 @@ inline void ChessView::drawBoard(const Board &board,
                                static_cast<float>(closeFontSize)) *
                                   0.5f),
              closeFontSize, {245, 240, 240, 255});
+  }
+
+  if (promotionPrompt.has_value()) {
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), {0, 0, 0, 120});
+
+    const Rectangle dialog = getPromotionDialogRect();
+    const Vector2 mousePos = GetMousePosition();
+    const float uiScale = getUiScale();
+    const int titleFontSize = static_cast<int>(20.0f * uiScale);
+
+    DrawRectangleRounded(dialog, 0.16f, 12, {32, 38, 50, 255});
+    DrawRectangleRoundedLinesEx(dialog, 0.16f, 12, 2.0f, {110, 124, 150, 255});
+
+    const char *titleText = "Choose promotion";
+    const int titleWidth = MeasureText(titleText, titleFontSize);
+    DrawText(titleText,
+             static_cast<int>(dialog.x +
+                              (dialog.width - static_cast<float>(titleWidth)) *
+                                  0.5f),
+             static_cast<int>(dialog.y + 14.0f * uiScale), titleFontSize,
+             {235, 235, 235, 255});
+
+    const PieceType options[4] = {PieceType::Queen, PieceType::Rook,
+                                  PieceType::Bishop, PieceType::Knight};
+    for (int index = 0; index < 4; ++index) {
+      const Rectangle optionRect = getPromotionOptionRect(index);
+      const bool hovered = CheckCollisionPointRec(mousePos, optionRect);
+
+      DrawRectangleRounded(optionRect, 0.22f, 8,
+                           hovered ? GetColor(0x485670FF)
+                                   : GetColor(0x303A4EFF));
+      DrawRectangleRoundedLinesEx(optionRect, 0.22f, 8, 2.0f,
+                                  hovered ? GetColor(0x8498BEFF)
+                                          : GetColor(0x5A6982FF));
+
+      drawPiece(options[index], promotionPrompt->color, optionRect.x,
+                optionRect.y, optionRect.width, optionRect.height, 1.10f);
+    }
   }
 
   EndDrawing();

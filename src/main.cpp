@@ -16,6 +16,8 @@ int main() {
     return 1;
   }
 
+  InitAudioDevice();
+
   const char *appDir = GetApplicationDirectory();
   if (appDir != nullptr && appDir[0] != '\0') {
     ChangeDirectory(appDir);
@@ -40,12 +42,14 @@ int main() {
       DrawText("Press ESC to close.", 50, 320, 20, {230, 230, 230, 255});
       EndDrawing();
     }
+    CloseAudioDevice();
     CloseWindow();
     return 1;
   }
 
   controller.run();
 
+  CloseAudioDevice();
   CloseWindow();
   return 0;
 }
