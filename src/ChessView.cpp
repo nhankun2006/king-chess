@@ -549,7 +549,8 @@ void ChessView::drawPiece(PieceType type, ::Color color, float x, float y,
 void ChessView::drawBoard(
     const Board &board, const std::optional<Position> &selectedSquare,
     const std::vector<Move> &legalMoves, bool showRestartConfirm,
-    bool showWindowSizeDialog,
+    bool showWindowSizeDialog, GameState gameState,
+    const std::optional<::Color> &winnerColor,
     const std::optional<CastlingTween> &castlingTween,
     const std::optional<DragPreview> &dragPreview,
     const std::optional<PromotionPrompt> &promotionPrompt,
@@ -566,6 +567,10 @@ void ChessView::drawBoard(
       src = {0.0f, static_cast<float>(boardTexture_.height),
              static_cast<float>(boardTexture_.width),
              -static_cast<float>(boardTexture_.height)};
+    } else {
+      src = {static_cast<float>(boardTexture_.width), 0.0f,
+             -static_cast<float>(boardTexture_.width),
+             static_cast<float>(boardTexture_.height)};
     }
     const Rectangle dst = getBoardRenderRect();
     DrawTexturePro(boardTexture_, src, dst, {0.0f, 0.0f}, 0.0f,
@@ -582,6 +587,10 @@ void ChessView::drawBoard(
 
   auto getDisplayRow = [&](int boardRow) -> int {
     return isBoardFlipped_ ? (7 - boardRow) : boardRow;
+  };
+
+  auto getDisplayCol = [&](int boardCol) -> int {
+    return isBoardFlipped_ ? (7 - boardCol) : boardCol;
   };
 
   auto getBoardPieceScale = [](PieceType type) -> float {
@@ -605,7 +614,7 @@ void ChessView::drawBoard(
   };
 
   for (const auto &move : legalMoves) {
-    const int displayCol = move.to.col;
+    const int displayCol = getDisplayCol(move.to.col);
     const int displayRow = getDisplayRow(move.to.row);
     DrawRectangleRec({grid.x + static_cast<float>(displayCol) * cellW,
                       grid.y + static_cast<float>(displayRow) * cellH, cellW,
@@ -647,7 +656,7 @@ void ChessView::drawBoard(
           continue;
         }
 
-        const int displayCol = col;
+        const int displayCol = getDisplayCol(col);
         const int displayRow = getDisplayRow(row);
         const float boardPieceScale = getBoardPieceScale(piece->getType());
 
@@ -716,7 +725,7 @@ void ChessView::drawBoard(
       popupProgress = 1.0f;
     }
 
-    const int popupDisplayCol = captureCounterPopup->pos.col;
+    const int popupDisplayCol = getDisplayCol(captureCounterPopup->pos.col);
     const int popupDisplayRow = getDisplayRow(captureCounterPopup->pos.row);
     const float squareX = grid.x + static_cast<float>(popupDisplayCol) * cellW;
     const float squareY = grid.y + static_cast<float>(popupDisplayRow) * cellH;
@@ -790,12 +799,14 @@ void ChessView::drawBoard(
     }
 
     const float kingStartX =
-        grid.x + static_cast<float>(castlingTween->kingFrom.col) * cellW;
+        grid.x +
+        static_cast<float>(getDisplayCol(castlingTween->kingFrom.col)) * cellW;
     const float kingStartY =
         grid.y +
         static_cast<float>(getDisplayRow(castlingTween->kingFrom.row)) * cellH;
     const float kingEndX =
-        grid.x + static_cast<float>(castlingTween->kingTo.col) * cellW;
+        grid.x +
+        static_cast<float>(getDisplayCol(castlingTween->kingTo.col)) * cellW;
     const float kingEndY =
         grid.y +
         static_cast<float>(getDisplayRow(castlingTween->kingTo.row)) * cellH;
@@ -805,12 +816,14 @@ void ChessView::drawBoard(
               getBoardPieceScale(PieceType::King));
 
     const float rookStartX =
-        grid.x + static_cast<float>(castlingTween->rookFrom.col) * cellW;
+        grid.x +
+        static_cast<float>(getDisplayCol(castlingTween->rookFrom.col)) * cellW;
     const float rookStartY =
         grid.y +
         static_cast<float>(getDisplayRow(castlingTween->rookFrom.row)) * cellH;
     const float rookEndX =
-        grid.x + static_cast<float>(castlingTween->rookTo.col) * cellW;
+        grid.x +
+        static_cast<float>(getDisplayCol(castlingTween->rookTo.col)) * cellW;
     const float rookEndY =
         grid.y +
         static_cast<float>(getDisplayRow(castlingTween->rookTo.row)) * cellH;
@@ -821,7 +834,7 @@ void ChessView::drawBoard(
   }
 
   if (selectedSquare.has_value()) {
-    const int displayCol = selectedSquare->col;
+    const int displayCol = getDisplayCol(selectedSquare->col);
     const int displayRow = getDisplayRow(selectedSquare->row);
     DrawRectangleLinesEx({grid.x + static_cast<float>(displayCol) * cellW,
                           grid.y + static_cast<float>(displayRow) * cellH,
@@ -830,7 +843,7 @@ void ChessView::drawBoard(
   }
 
   if (invalidHighlightSquare.has_value()) {
-    const int displayCol = invalidHighlightSquare->col;
+    const int displayCol = getDisplayCol(invalidHighlightSquare->col);
     const int displayRow = getDisplayRow(invalidHighlightSquare->row);
     const Rectangle invalidRect = {
         grid.x + static_cast<float>(displayCol) * cellW,
@@ -1150,6 +1163,63 @@ void ChessView::drawBoard(
 
     drawCapturedSection(rightPanelX, bottomSectionY, rightPanelWidth,
                         bottomTitle, bottomPieceColor, bottomCaptured);
+  }
+
+  if (gameState == GameState::Checkmate || gameState == GameState::Stalemate) {
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), {0, 0, 0, 130});
+
+    const float uiScale = getUiScale();
+    float dialogWidth = 360.0f * uiScale;
+    const float dialogHeight = 168.0f * uiScale;
+    const float maxWidth = static_cast<float>(GetScreenWidth()) - 40.0f;
+    if (dialogWidth > maxWidth) {
+      dialogWidth = maxWidth;
+    }
+    const Rectangle dialog = {
+        (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f,
+        (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f,
+        dialogWidth, dialogHeight};
+
+    const int titleFontSize = static_cast<int>(30.0f * uiScale);
+    const int bodyFontSize = static_cast<int>(18.0f * uiScale);
+    const int hintFontSize = static_cast<int>(15.0f * uiScale);
+
+    const char *titleText =
+        (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
+    const char *bodyText = "";
+    if (gameState == GameState::Checkmate) {
+      if (winnerColor.has_value() && *winnerColor == ::Color::White) {
+        bodyText = "White wins";
+      } else if (winnerColor.has_value() && *winnerColor == ::Color::Black) {
+        bodyText = "Black wins";
+      } else {
+        bodyText = "Win";
+      }
+    } else {
+      bodyText = "No legal moves and king is safe";
+    }
+    const char *hintText = "Press Restart to play again";
+
+    const int titleWidth = MeasureText(titleText, titleFontSize);
+    const int bodyWidth = MeasureText(bodyText, bodyFontSize);
+    const int hintWidth = MeasureText(hintText, hintFontSize);
+
+    DrawRectangleRounded(dialog, 0.15f, 12, {30, 35, 48, 255});
+    DrawRectangleRoundedLinesEx(dialog, 0.15f, 12, 2.0f, {112, 125, 150, 255});
+
+    DrawText(titleText,
+             static_cast<int>(dialog.x + (dialog.width - titleWidth) * 0.5f),
+             static_cast<int>(dialog.y + 24.0f * uiScale), titleFontSize,
+             (gameState == GameState::Checkmate) ? GetColor(0xFFDCAAFF)
+                                                 : GetColor(0xDCEBFFFF));
+    DrawText(bodyText,
+             static_cast<int>(dialog.x + (dialog.width - bodyWidth) * 0.5f),
+             static_cast<int>(dialog.y + 78.0f * uiScale), bodyFontSize,
+             {232, 238, 246, 255});
+    DrawText(hintText,
+             static_cast<int>(dialog.x + (dialog.width - hintWidth) * 0.5f),
+             static_cast<int>(dialog.y + 118.0f * uiScale), hintFontSize,
+             {176, 188, 205, 255});
   }
 
   if (showRestartConfirm) {
