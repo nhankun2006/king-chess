@@ -1,5 +1,7 @@
 #include "Game.h"
 
+#include <algorithm>
+
 // ─── Constructor ────────────────────────────────────────────────────────────
 
 Game::Game() { board_.setupInitialPosition(); }
@@ -177,6 +179,11 @@ void Game::updateGameState() {
 // ─── Make Move ──────────────────────────────────────────────────────────────
 
 bool Game::makeMove(const Move &move) {
+  if (state_ == GameState::Checkmate || state_ == GameState::Stalemate ||
+      state_ == GameState::Draw) {
+    return false;
+  }
+
   // 1) Verify the move is legal
   auto legalMoves = getLegalMoves(move.from);
   bool found = false;
@@ -205,6 +212,15 @@ bool Game::makeMove(const Move &move) {
   // 6) Detect check / checkmate / stalemate for the next player
   updateGameState();
 
+  notifyMoveMade(move.from, move.to);
+  if (state_ == GameState::Check) {
+    notifyCheck(currentTurn_);
+  } else if (state_ == GameState::Checkmate) {
+    notifyCheckmate(currentTurn_);
+  } else if (state_ == GameState::Stalemate) {
+    notifyStalemate();
+  }
+
   return true;
 }
 
@@ -218,4 +234,62 @@ void Game::restart() {
   castlingRights_[1] = true;
   castlingRights_[2] = true;
   castlingRights_[3] = true;
+}
+
+void Game::attach(Observer *observer) {
+  if (observer == nullptr) {
+    return;
+  }
+
+  const auto it =
+      std::find(observers_.begin(), observers_.end(), observer);
+  if (it == observers_.end()) {
+    observers_.push_back(observer);
+  }
+}
+
+void Game::detach(Observer *observer) {
+  observers_.erase(
+      std::remove(observers_.begin(), observers_.end(), observer),
+      observers_.end());
+}
+
+void Game::notifyMoveMade(Position from, Position to) {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->onMoveMade(from, to);
+    }
+  }
+}
+
+void Game::notifyCheck(Color color) {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->onCheck(color);
+    }
+  }
+}
+
+void Game::notifyCheckmate(Color color) {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->onCheckmate(color);
+    }
+  }
+}
+
+void Game::notifyStalemate() {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->onStalemate();
+    }
+  }
+}
+
+void Game::notifyDraw() {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->onDraw();
+    }
+  }
 }

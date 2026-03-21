@@ -107,6 +107,8 @@ public:
       const std::optional<Position> &selectedSquare = std::nullopt,
       const std::vector<Move> &legalMoves = {}, bool showRestartConfirm = false,
       bool showWindowSizeDialog = false,
+      GameState gameState = GameState::Playing,
+      const std::optional<::Color> &winnerColor = std::nullopt,
       const std::optional<CastlingTween> &castlingTween = std::nullopt,
       const std::optional<DragPreview> &dragPreview = std::nullopt,
       const std::optional<PromotionPrompt> &promotionPrompt = std::nullopt,
