@@ -114,9 +114,10 @@ public:
                  const std::vector<BurningPieceInfo> &burningPieces = {},
                  const CaptureCounterPopup *captureCounterPopup = nullptr);
 
-  void onMoveMade(Position from, Position to) override {
+  void onMoveMade(Position from, Position to, bool isCapture) override {
     (void)from;
     (void)to;
+    (void)isCapture;
   }
 
   void onCheck(::Color color) override { (void)color; }

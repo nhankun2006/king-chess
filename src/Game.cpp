@@ -196,23 +196,34 @@ bool Game::makeMove(const Move &move) {
   if (!found)
     return false;
 
-  // 2) Execute the move on the board
+  // 2) Detect capture before executing (target square or en passant)
+  bool isCapture = move.isEnPassant;
+  if (!isCapture) {
+    const Piece *targetPiece = board_.getPieceAt(move.to);
+    if (targetPiece != nullptr) {
+      const Piece *sourcePiece = board_.getPieceAt(move.from);
+      isCapture = (sourcePiece == nullptr) ||
+                  (targetPiece->getColor() != sourcePiece->getColor());
+    }
+  }
+
+  // 3) Execute the move on the board
   board_.executeMove(move);
 
-  // 3) Update castling rights (must be done after move execution
+  // 4) Update castling rights (must be done after move execution
   //    because we need to inspect the moved piece at its new position)
   updateCastlingRights(move);
 
-  // 4) Record the move
+  // 5) Record the move
   moveHistory_.push_back(move);
 
-  // 5) Switch turn
+  // 6) Switch turn
   currentTurn_ = oppositeColor(currentTurn_);
 
-  // 6) Detect check / checkmate / stalemate for the next player
+  // 7) Detect check / checkmate / stalemate for the next player
   updateGameState();
 
-  notifyMoveMade(move.from, move.to);
+  notifyMoveMade(move.from, move.to, isCapture);
   if (state_ == GameState::Check) {
     notifyCheck(currentTurn_);
   } else if (state_ == GameState::Checkmate) {
@@ -241,23 +252,21 @@ void Game::attach(Observer *observer) {
     return;
   }
 
-  const auto it =
-      std::find(observers_.begin(), observers_.end(), observer);
+  const auto it = std::find(observers_.begin(), observers_.end(), observer);
   if (it == observers_.end()) {
     observers_.push_back(observer);
   }
 }
 
 void Game::detach(Observer *observer) {
-  observers_.erase(
-      std::remove(observers_.begin(), observers_.end(), observer),
-      observers_.end());
+  observers_.erase(std::remove(observers_.begin(), observers_.end(), observer),
+                   observers_.end());
 }
 
-void Game::notifyMoveMade(Position from, Position to) {
+void Game::notifyMoveMade(Position from, Position to, bool isCapture) {
   for (auto *observer : observers_) {
     if (observer != nullptr) {
-      observer->onMoveMade(from, to);
+      observer->onMoveMade(from, to, isCapture);
     }
   }
 }

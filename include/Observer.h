@@ -6,7 +6,7 @@
 class Observer {
 public:
   virtual ~Observer() = default;
-  virtual void onMoveMade(Position from, Position to) = 0;
+  virtual void onMoveMade(Position from, Position to, bool isCapture) = 0;
   virtual void onCheck(Color color) = 0;
   virtual void onCheckmate(Color color) = 0;
   virtual void onStalemate() = 0;

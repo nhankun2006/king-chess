@@ -21,24 +21,6 @@ ChessController::~ChessController() {
 }
 
 void ChessController::run() {
-  sound_.loadSounds();
-
-  auto isCaptureMoveBeforeExecute = [&](const Move &move) -> bool {
-    if (move.isEnPassant) {
-      return true;
-    }
-
-    const Piece *sourcePiece = game_->getBoard().getPieceAt(move.from);
-    const Piece *targetPiece = game_->getBoard().getPieceAt(move.to);
-    if (targetPiece == nullptr) {
-      return false;
-    }
-    if (sourcePiece == nullptr) {
-      return true;
-    }
-    return targetPiece->getColor() != sourcePiece->getColor();
-  };
-
   auto getActiveCastlingTween =
       [&](ChessView::CastlingTween &outTween) -> bool {
     if (castlingTween_ == nullptr) {
@@ -217,11 +199,12 @@ void ChessController::run() {
         if (selectedPromotion != PieceType::None) {
           for (const auto &move : pendingPromotionMoves_) {
             if (move.promotion == selectedPromotion) {
-              const bool willCapture = isCaptureMoveBeforeExecute(move);
+              const bool willCapture =
+                  move.isEnPassant ||
+                  (game_->getBoard().getPieceAt(move.to) != nullptr);
               if (!game_->makeMove(move)) {
                 continue;
               }
-              sound_.playMoveSound(willCapture);
               const int captureCount = updateCaptureStreaks(move, willCapture);
               if (willCapture) {
                 if (captureCount >= 2) {
@@ -413,7 +396,9 @@ void ChessController::run() {
       }
 
       if (!promotionPromptOpen_ && hasAttemptedMove) {
-        const bool willCapture = isCaptureMoveBeforeExecute(attemptedMove);
+        const bool willCapture =
+            attemptedMove.isEnPassant ||
+            (game_->getBoard().getPieceAt(attemptedMove.to) != nullptr);
         if (!game_->makeMove(attemptedMove)) {
           hasAttemptedMove = false;
           hasAttemptedMoveIsCapture = false;
@@ -426,7 +411,6 @@ void ChessController::run() {
       if (!promotionPromptOpen_ && hasAttemptedMove) {
         const bool wasCapture =
             hasAttemptedMoveIsCapture ? attemptedMoveIsCapture : false;
-        sound_.playMoveSound(wasCapture);
         const int captureCount =
             updateCaptureStreaks(attemptedMove, wasCapture);
         if (wasCapture) {

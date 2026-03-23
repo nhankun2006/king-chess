@@ -5,6 +5,7 @@
 #undef Color
 
 #include "ChessControllder.h"
+#include "ChessSound.h"
 #include "ChessView.h"
 #include "Game.h"
 
@@ -26,6 +27,10 @@ int main() {
   SetTargetFPS(60);
   Game game;
   ChessView view;
+  ChessSound sound;
+  sound.loadSounds();
+  game.attach(&view);
+  game.attach(&sound);
   ChessController controller(game, view);
 
   if (!view.LoadAssets()) {

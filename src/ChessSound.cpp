@@ -55,7 +55,10 @@ bool ChessSound::loadSounds() {
   return pieceMoveSoundLoaded_ || captureSoundLoaded_;
 }
 
-void ChessSound::playMoveSound(bool isCapture) {
+void ChessSound::onMoveMade(Position from, Position to, bool isCapture) {
+  (void)from;
+  (void)to;
+
   if (isCapture) {
     if (captureSoundLoaded_) {
       PlaySound(captureSound_);

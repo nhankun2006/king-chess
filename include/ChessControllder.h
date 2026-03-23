@@ -5,14 +5,12 @@
 #include <vector>
 
 #include "Game.h"
-#include "ChessSound.h"
 #include "ChessView.h"
 
 class ChessController {
 private:
   Game *game_ = nullptr;
   ChessView *view_ = nullptr;
-  ChessSound sound_;
   Position *selectedSquare_ = nullptr;
   std::vector<Move> selectedLegalMoves_;
   bool restartConfirmOpen_ = false;

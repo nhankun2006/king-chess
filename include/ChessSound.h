@@ -5,11 +5,13 @@
 #undef Color
 #endif
 
+#include "Observer.h"
+
 #define Color RLColor
 #include <raylib.h>
 #undef Color
 
-class ChessSound {
+class ChessSound : public Observer {
 private:
   Sound pieceMoveSound_{};
   bool pieceMoveSoundLoaded_ = false;
@@ -20,11 +22,17 @@ private:
 
 public:
   ChessSound() = default;
-  ~ChessSound();
+  ~ChessSound() override;
 
   bool loadSounds();
-  void playMoveSound(bool isCapture);
   void unloadSounds();
+
+  // Observer interface
+  void onMoveMade(Position from, Position to, bool isCapture) override;
+  void onCheck(Color color) override { (void)color; }
+  void onCheckmate(Color color) override { (void)color; }
+  void onStalemate() override {}
+  void onDraw() override {}
 };
 
 #endif // CHESSSOUND_H
