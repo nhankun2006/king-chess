@@ -5,19 +5,39 @@
 #include <string>
 #include <vector>
 
-#ifdef Color
-#undef Color
-#endif
-
 #include "Observer.h"
 #include "Types.h"
 
-#define Color RLColor
 #include <raylib.h>
-#undef Color
 
 #include "Board.h"
 #include "Move.h"
+
+// ─── View-related data structs ──────────────────────────────────────────────
+
+struct CastlingTween {
+  ChessColor color = ChessColor::White;
+  Position kingFrom{};
+  Position kingTo{};
+  Position rookFrom{};
+  Position rookTo{};
+  float progress = 1.0f;
+};
+
+struct DragPreview {
+  PieceType type = PieceType::None;
+  ChessColor color = ChessColor::White;
+  Position from{};
+  Vector2 mousePos{0.0f, 0.0f};
+};
+
+struct CaptureEffect {
+  Position pos{};
+  int captureCount = 0;
+  float progress = 0.0f;
+};
+
+// ─── ChessView ──────────────────────────────────────────────────────────────
 
 class ChessView : public Observer {
 private:
@@ -53,37 +73,6 @@ private:
   Rectangle getPromotionOptionRect(int index) const;
 
 public:
-  struct CastlingTween {
-    ::Color color = ::Color::White;
-    Position kingFrom{};
-    Position kingTo{};
-    Position rookFrom{};
-    Position rookTo{};
-    float progress = 1.0f;
-  };
-
-  struct DragPreview {
-    PieceType type = PieceType::None;
-    ::Color color = ::Color::White;
-    Position from{};
-    Vector2 mousePos{0.0f, 0.0f};
-  };
-
-  struct PromotionPrompt {
-    ::Color color = ::Color::White;
-  };
-
-  struct BurningPieceInfo {
-    Position pos{};
-    int captureCount = 0;
-  };
-
-  struct CaptureCounterPopup {
-    Position pos{};
-    int captureCount = 0;
-    float progress = 0.0f;
-  };
-
   ChessView() = default;
   ~ChessView();
 
@@ -99,20 +88,20 @@ public:
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
   PieceType getPromotionOptionClicked(float x, float y) const;
   bool screenToBoardSquare(float x, float y, Position &out) const;
-  void drawPiece(PieceType type, ::Color color, float x, float y, float w,
+  void drawPiece(PieceType type, ChessColor color, float x, float y, float w,
                  float h, float sizeMultiplier = 1.0f);
   void drawBoard(const Board &board, const Position *selectedSquare = nullptr,
                  const std::vector<Move> &legalMoves = {},
                  bool showRestartConfirm = false,
                  bool showWindowSizeDialog = false,
                  GameState gameState = GameState::Playing,
-                 const ::Color *winnerColor = nullptr,
+                 const ChessColor *winnerColor = nullptr,
                  const CastlingTween *castlingTween = nullptr,
                  const DragPreview *dragPreview = nullptr,
-                 const PromotionPrompt *promotionPrompt = nullptr,
+                 const ChessColor *promotionColor = nullptr,
                  const Position *invalidHighlightSquare = nullptr,
-                 const std::vector<BurningPieceInfo> &burningPieces = {},
-                 const CaptureCounterPopup *captureCounterPopup = nullptr);
+                 const std::vector<CaptureEffect> &burningPieces = {},
+                 const CaptureEffect *captureCounterPopup = nullptr);
 
   void onMoveMade(Position from, Position to, bool isCapture) override {
     (void)from;
@@ -120,9 +109,9 @@ public:
     (void)isCapture;
   }
 
-  void onCheck(::Color color) override { (void)color; }
+  void onCheck(ChessColor color) override { (void)color; }
 
-  void onCheckmate(::Color color) override { (void)color; }
+  void onCheckmate(ChessColor color) override { (void)color; }
 
   void onStalemate() override {}
 

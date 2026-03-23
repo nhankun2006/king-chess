@@ -21,8 +21,7 @@ ChessController::~ChessController() {
 }
 
 void ChessController::run() {
-  auto getActiveCastlingTween =
-      [&](ChessView::CastlingTween &outTween) -> bool {
+  auto getActiveCastlingTween = [&](CastlingTween &outTween) -> bool {
     if (castlingTween_ == nullptr) {
       return false;
     }
@@ -82,8 +81,8 @@ void ChessController::run() {
   };
 
   auto drawFrame = [&]() {
-    ChessView::DragPreview dragPreviewVal;
-    ChessView::DragPreview *dragPreview = nullptr;
+    DragPreview dragPreviewVal;
+    DragPreview *dragPreview = nullptr;
     if (isDraggingPiece_ && dragFromSquare_ != nullptr &&
         dragPieceType_ != PieceType::None) {
       dragPreviewVal.type = dragPieceType_;
@@ -93,11 +92,9 @@ void ChessController::run() {
       dragPreview = &dragPreviewVal;
     }
 
-    ChessView::PromotionPrompt promotionPromptVal;
-    ChessView::PromotionPrompt *promotionPrompt = nullptr;
+    ::ChessColor *promotionColor = nullptr;
     if (promotionPromptOpen_) {
-      promotionPromptVal.color = promotionPromptColor_;
-      promotionPrompt = &promotionPromptVal;
+      promotionColor = &promotionPromptColor_;
     }
 
     Position *invalidHighlight = nullptr;
@@ -111,7 +108,7 @@ void ChessController::run() {
       }
     }
 
-    std::vector<ChessView::BurningPieceInfo> burningPieces;
+    std::vector<CaptureEffect> burningPieces;
     for (const auto &[key, captureCount] : pieceCaptureCounts_) {
       if (captureCount < 2) {
         continue;
@@ -122,8 +119,8 @@ void ChessController::run() {
       }
     }
 
-    ChessView::CaptureCounterPopup captureCounterPopupVal;
-    ChessView::CaptureCounterPopup *captureCounterPopup = nullptr;
+    CaptureEffect captureCounterPopupVal;
+    CaptureEffect *captureCounterPopup = nullptr;
     if (captureCounterPopupSquare_ != nullptr &&
         captureCounterPopupCount_ >= 2) {
       const double elapsed = GetTime() - captureCounterPopupStartTime_;
@@ -142,28 +139,28 @@ void ChessController::run() {
     }
 
     const GameState gameState = game_->getState();
-    Color winnerColorVal = Color::White;
-    Color *winnerColor = nullptr;
+    ChessColor winnerColorVal = ChessColor::White;
+    ChessColor *winnerColor = nullptr;
     if (gameState == GameState::Checkmate) {
       winnerColorVal = oppositeColor(game_->getCurrentTurn());
       winnerColor = &winnerColorVal;
     }
 
-    ChessView::CastlingTween activeTween;
-    ChessView::CastlingTween *activeTweenPtr = nullptr;
+    CastlingTween activeTween;
+    CastlingTween *activeTweenPtr = nullptr;
     if (getActiveCastlingTween(activeTween)) {
       activeTweenPtr = &activeTween;
     }
 
     view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
                      restartConfirmOpen_, windowSizeDialogOpen_, gameState,
-                     winnerColor, activeTweenPtr, dragPreview, promotionPrompt,
+                     winnerColor, activeTweenPtr, dragPreview, promotionColor,
                      invalidHighlight, burningPieces, captureCounterPopup);
   };
 
   auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {
     Position warningSquare = {-1, -1};
-    const Color sideToMove = game_->getCurrentTurn();
+    const ChessColor sideToMove = game_->getCurrentTurn();
     const Board &board = game_->getBoard();
 
     if (board.isInCheck(sideToMove)) {
@@ -429,7 +426,7 @@ void ChessController::run() {
         }
         if (attemptedMove.isCastling && selectedPiece != nullptr &&
             selectedPiece->getType() == PieceType::King) {
-          ChessView::CastlingTween tween;
+          CastlingTween tween;
           tween.color = selectedPiece->getColor();
           tween.kingFrom = attemptedMove.from;
           tween.kingTo = attemptedMove.to;
@@ -439,7 +436,7 @@ void ChessController::run() {
           tween.rookTo = {attemptedMove.from.row, rookToCol};
           tween.progress = 0.0f;
           delete castlingTween_;
-          castlingTween_ = new ChessView::CastlingTween(tween);
+          castlingTween_ = new CastlingTween(tween);
           castlingTweenStartTime_ = GetTime();
         }
       } else if (!promotionPromptOpen_) {

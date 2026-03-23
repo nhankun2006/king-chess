@@ -1,8 +1,6 @@
 #include <cstdio>
 
-#define Color RaylibColor
 #include <raylib.h>
-#undef Color
 
 #include "ChessControllder.h"
 #include "ChessSound.h"

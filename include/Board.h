@@ -35,9 +35,9 @@ public:
   void setEnPassantTarget(Position pos) { enPassantTarget_ = pos; }
 
   // Queries
-  bool isSquareAttacked(Position pos, Color byColor) const;
-  Position findKing(Color color) const;
-  bool isInCheck(Color color) const;
+  bool isSquareAttacked(Position pos, ChessColor byColor) const;
+  Position findKing(ChessColor color) const;
+  bool isInCheck(ChessColor color) const;
 
   // Serialization
   std::string toFEN() const; // Board portion of FEN (piece placement only)

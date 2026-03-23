@@ -65,13 +65,13 @@ void Board::setupInitialPosition() {
 
   for (int c = 0; c < 8; ++c) {
     // White back rank (row 0 = rank 1)
-    grid_[0][c] = Piece::create(backRank[c], Color::White);
+    grid_[0][c] = Piece::create(backRank[c], ChessColor::White);
     // White pawns (row 1 = rank 2)
-    grid_[1][c] = Piece::create(PieceType::Pawn, Color::White);
+    grid_[1][c] = Piece::create(PieceType::Pawn, ChessColor::White);
     // Black pawns (row 6 = rank 7)
-    grid_[6][c] = Piece::create(PieceType::Pawn, Color::Black);
+    grid_[6][c] = Piece::create(PieceType::Pawn, ChessColor::Black);
     // Black back rank (row 7 = rank 8)
-    grid_[7][c] = Piece::create(backRank[c], Color::Black);
+    grid_[7][c] = Piece::create(backRank[c], ChessColor::Black);
   }
 }
 
@@ -132,7 +132,7 @@ void Board::executeMove(const Move &move) {
 
   // 4) Handle promotion
   if (move.promotion != PieceType::None) {
-    Color color = grid_[move.to.row][move.to.col]->getColor();
+    ChessColor color = grid_[move.to.row][move.to.col]->getColor();
     grid_[move.to.row][move.to.col] = Piece::create(move.promotion, color);
     grid_[move.to.row][move.to.col]->setMoved();
   }
@@ -151,7 +151,7 @@ void Board::executeMove(const Move &move) {
 
 // ─── Queries ────────────────────────────────────────────────────────────────
 
-bool Board::isSquareAttacked(Position pos, Color byColor) const {
+bool Board::isSquareAttacked(Position pos, ChessColor byColor) const {
   for (int r = 0; r < 8; ++r) {
     for (int c = 0; c < 8; ++c) {
       const Piece *piece = grid_[r][c].get();
@@ -171,7 +171,7 @@ bool Board::isSquareAttacked(Position pos, Color byColor) const {
   return false;
 }
 
-Position Board::findKing(Color color) const {
+Position Board::findKing(ChessColor color) const {
   for (int r = 0; r < 8; ++r) {
     for (int c = 0; c < 8; ++c) {
       const Piece *piece = grid_[r][c].get();
@@ -184,7 +184,7 @@ Position Board::findKing(Color color) const {
   return {-1, -1}; // Should never happen in a valid game
 }
 
-bool Board::isInCheck(Color color) const {
+bool Board::isInCheck(ChessColor color) const {
   Position kingPos = findKing(color);
   return isSquareAttacked(kingPos, oppositeColor(color));
 }

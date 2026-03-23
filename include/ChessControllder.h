@@ -15,15 +15,15 @@ private:
   std::vector<Move> selectedLegalMoves_;
   bool restartConfirmOpen_ = false;
   bool windowSizeDialogOpen_ = false;
-  ChessView::CastlingTween *castlingTween_ = nullptr;
+  CastlingTween *castlingTween_ = nullptr;
   double castlingTweenStartTime_ = 0.0;
   float castlingTweenDurationSeconds_ = 0.22f;
   bool isDraggingPiece_ = false;
   Position *dragFromSquare_ = nullptr;
   PieceType dragPieceType_ = PieceType::None;
-  Color dragPieceColor_ = Color::White;
+  ChessColor dragPieceColor_ = ChessColor::White;
   bool promotionPromptOpen_ = false;
-  Color promotionPromptColor_ = Color::White;
+  ChessColor promotionPromptColor_ = ChessColor::White;
   std::vector<Move> pendingPromotionMoves_;
   Position *invalidHighlightSquare_ = nullptr;
   double invalidHighlightStartTime_ = 0.0;

@@ -503,14 +503,14 @@ bool ChessView::screenToBoardSquare(float x, float y, Position &out) const {
   return true;
 }
 
-void ChessView::drawPiece(PieceType type, ::Color color, float x, float y,
+void ChessView::drawPiece(PieceType type, ::ChessColor color, float x, float y,
                           float w, float h, float sizeMultiplier) {
   const auto &textures =
-      (color == ::Color::White) ? whiteTextures_ : blackTextures_;
+      (color == ChessColor::White) ? whiteTextures_ : blackTextures_;
   const auto &sourceRects =
-      (color == ::Color::White) ? whiteSourceRects_ : blackSourceRects_;
+      (color == ChessColor::White) ? whiteSourceRects_ : blackSourceRects_;
   const auto &centerOffsets =
-      (color == ::Color::White) ? whiteCenterOffsetX_ : blackCenterOffsetX_;
+      (color == ChessColor::White) ? whiteCenterOffsetX_ : blackCenterOffsetX_;
   const auto it = textures.find(type);
   if (it == textures.end() || it->second.id == 0) {
     return;
@@ -548,13 +548,13 @@ void ChessView::drawPiece(PieceType type, ::Color color, float x, float y,
 void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                           const std::vector<Move> &legalMoves,
                           bool showRestartConfirm, bool showWindowSizeDialog,
-                          GameState gameState, const ::Color *winnerColor,
+                          GameState gameState, const ::ChessColor *winnerColor,
                           const CastlingTween *castlingTween,
                           const DragPreview *dragPreview,
-                          const PromotionPrompt *promotionPrompt,
+                          const ::ChessColor *promotionColor,
                           const Position *invalidHighlightSquare,
-                          const std::vector<BurningPieceInfo> &burningPieces,
-                          const CaptureCounterPopup *captureCounterPopup) {
+                          const std::vector<CaptureEffect> &burningPieces,
+                          const CaptureEffect *captureCounterPopup) {
   BeginDrawing();
   ClearBackground({0, 0, 0, 255});
 
@@ -884,7 +884,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
       }
 
       const PieceType type = piece->getType();
-      if (piece->getColor() == ::Color::White) {
+      if (piece->getColor() == ChessColor::White) {
         whiteRemaining[type] += 1;
       } else {
         blackRemaining[type] += 1;
@@ -913,7 +913,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
 
   auto drawCapturedSection =
       [&](int sectionX, int sectionY, int sectionWidth, const char *title,
-          ::Color capturedColor,
+          ChessColor capturedColor,
           const std::map<PieceType, int> &captured) -> int {
     const float uiScale = getUiScale();
     float capturedScale = getBoardRenderRect().width / 512.0f;
@@ -1134,15 +1134,15 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     const bool swapCapturedSections = isBoardFlipped_;
     const char *topTitle =
         swapCapturedSections ? "Black captured" : "White captured";
-    const ::Color topPieceColor =
-        swapCapturedSections ? ::Color::White : ::Color::Black;
+    const ChessColor topPieceColor =
+        swapCapturedSections ? ChessColor::White : ChessColor::Black;
     const std::map<PieceType, int> &topCaptured =
         swapCapturedSections ? capturedWhitePieces : capturedBlackPieces;
 
     const char *bottomTitle =
         swapCapturedSections ? "White captured" : "Black captured";
-    const ::Color bottomPieceColor =
-        swapCapturedSections ? ::Color::Black : ::Color::White;
+    const ChessColor bottomPieceColor =
+        swapCapturedSections ? ChessColor::Black : ChessColor::White;
     const std::map<PieceType, int> &bottomCaptured =
         swapCapturedSections ? capturedBlackPieces : capturedWhitePieces;
 
@@ -1186,9 +1186,9 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
     const char *bodyText = "";
     if (gameState == GameState::Checkmate) {
-      if (winnerColor != nullptr && *winnerColor == ::Color::White) {
+      if (winnerColor != nullptr && *winnerColor == ChessColor::White) {
         bodyText = "White wins";
-      } else if (winnerColor != nullptr && *winnerColor == ::Color::Black) {
+      } else if (winnerColor != nullptr && *winnerColor == ChessColor::Black) {
         bodyText = "Black wins";
       } else {
         bodyText = "Win";
@@ -1358,7 +1358,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         closeFontSize, {245, 240, 240, 255});
   }
 
-  if (promotionPrompt != nullptr) {
+  if (promotionColor != nullptr) {
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), {0, 0, 0, 120});
 
     const Rectangle dialog = getPromotionDialogRect();
@@ -1391,8 +1391,8 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                                   hovered ? GetColor(0x8498BEFF)
                                           : GetColor(0x5A6982FF));
 
-      drawPiece(options[index], promotionPrompt->color, optionRect.x,
-                optionRect.y, optionRect.width, optionRect.height, 1.10f);
+      drawPiece(options[index], *promotionColor, optionRect.x, optionRect.y,
+                optionRect.width, optionRect.height, 1.10f);
     }
   }
 
