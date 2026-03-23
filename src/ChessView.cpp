@@ -441,8 +441,7 @@ bool ChessView::isRestartButtonClicked(float x, float y) const {
          y >= restartButton.y && y <= restartButton.y + restartButton.height;
 }
 
-std::optional<int> ChessView::getWindowSizeOptionClicked(float x,
-                                                         float y) const {
+int ChessView::getWindowSizeOptionClicked(float x, float y) const {
   for (int index = 0; index < 4; ++index) {
     const Rectangle option = getWindowSizeOptionRect(index);
     if (x >= option.x && x <= option.x + option.width && y >= option.y &&
@@ -451,11 +450,10 @@ std::optional<int> ChessView::getWindowSizeOptionClicked(float x,
     }
   }
 
-  return std::nullopt;
+  return -1;
 }
 
-std::optional<PieceType> ChessView::getPromotionOptionClicked(float x,
-                                                              float y) const {
+PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
   const PieceType options[4] = {PieceType::Queen, PieceType::Rook,
                                 PieceType::Bishop, PieceType::Knight};
   for (int index = 0; index < 4; ++index) {
@@ -465,7 +463,7 @@ std::optional<PieceType> ChessView::getPromotionOptionClicked(float x,
       return options[index];
     }
   }
-  return std::nullopt;
+  return PieceType::None;
 }
 
 bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
@@ -486,11 +484,11 @@ bool ChessView::isRestartConfirmNoClicked(float x, float y) const {
          y >= noButton.y && y <= noButton.y + noButton.height;
 }
 
-std::optional<Position> ChessView::screenToBoardSquare(float x, float y) const {
+bool ChessView::screenToBoardSquare(float x, float y, Position &out) const {
   const Rectangle grid = getBoardGridRect();
   if (x < grid.x || y < grid.y || x >= grid.x + grid.width ||
       y >= grid.y + grid.height) {
-    return std::nullopt;
+    return false;
   }
 
   const float cellW = grid.width / 8.0f;
@@ -501,7 +499,8 @@ std::optional<Position> ChessView::screenToBoardSquare(float x, float y) const {
   const int col = isBoardFlipped_ ? (7 - displayCol) : displayCol;
   const int row = isBoardFlipped_ ? (7 - displayRow) : displayRow;
 
-  return Position{row, col};
+  out = Position{row, col};
+  return true;
 }
 
 void ChessView::drawPiece(PieceType type, ::Color color, float x, float y,
@@ -546,17 +545,16 @@ void ChessView::drawPiece(PieceType type, ::Color color, float x, float y,
   DrawTexturePro(texture, src, dst, {0.0f, 0.0f}, 0.0f, {255, 255, 255, 255});
 }
 
-void ChessView::drawBoard(
-    const Board &board, const std::optional<Position> &selectedSquare,
-    const std::vector<Move> &legalMoves, bool showRestartConfirm,
-    bool showWindowSizeDialog, GameState gameState,
-    const std::optional<::Color> &winnerColor,
-    const std::optional<CastlingTween> &castlingTween,
-    const std::optional<DragPreview> &dragPreview,
-    const std::optional<PromotionPrompt> &promotionPrompt,
-    const std::optional<Position> &invalidHighlightSquare,
-    const std::vector<BurningPieceInfo> &burningPieces,
-    const std::optional<CaptureCounterPopup> &captureCounterPopup) {
+void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
+                          const std::vector<Move> &legalMoves,
+                          bool showRestartConfirm, bool showWindowSizeDialog,
+                          GameState gameState, const ::Color *winnerColor,
+                          const CastlingTween *castlingTween,
+                          const DragPreview *dragPreview,
+                          const PromotionPrompt *promotionPrompt,
+                          const Position *invalidHighlightSquare,
+                          const std::vector<BurningPieceInfo> &burningPieces,
+                          const CaptureCounterPopup *captureCounterPopup) {
   BeginDrawing();
   ClearBackground({0, 0, 0, 255});
 
@@ -581,9 +579,9 @@ void ChessView::drawBoard(
   const float cellW = grid.width / 8.0f;
   const float cellH = grid.height / 8.0f;
   const bool hasActiveCastlingTween =
-      castlingTween.has_value() && castlingTween->progress < 1.0f;
+      castlingTween != nullptr && castlingTween->progress < 1.0f;
   const bool hasActiveDragPreview =
-      dragPreview.has_value() && dragPreview->type != PieceType::None;
+      dragPreview != nullptr && dragPreview->type != PieceType::None;
 
   auto getDisplayRow = [&](int boardRow) -> int {
     return isBoardFlipped_ ? (7 - boardRow) : boardRow;
@@ -715,7 +713,7 @@ void ChessView::drawBoard(
     }
   }
 
-  if (captureCounterPopup.has_value() &&
+  if (captureCounterPopup != nullptr &&
       captureCounterPopup->captureCount >= 2) {
     float popupProgress = captureCounterPopup->progress;
     if (popupProgress < 0.0f) {
@@ -833,7 +831,7 @@ void ChessView::drawBoard(
               getBoardPieceScale(PieceType::Rook));
   }
 
-  if (selectedSquare.has_value()) {
+  if (selectedSquare != nullptr) {
     const int displayCol = getDisplayCol(selectedSquare->col);
     const int displayRow = getDisplayRow(selectedSquare->row);
     DrawRectangleLinesEx({grid.x + static_cast<float>(displayCol) * cellW,
@@ -842,7 +840,7 @@ void ChessView::drawBoard(
                          3.0f, {255, 255, 0, 255});
   }
 
-  if (invalidHighlightSquare.has_value()) {
+  if (invalidHighlightSquare != nullptr) {
     const int displayCol = getDisplayCol(invalidHighlightSquare->col);
     const int displayRow = getDisplayRow(invalidHighlightSquare->row);
     const Rectangle invalidRect = {
@@ -1188,9 +1186,9 @@ void ChessView::drawBoard(
         (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
     const char *bodyText = "";
     if (gameState == GameState::Checkmate) {
-      if (winnerColor.has_value() && *winnerColor == ::Color::White) {
+      if (winnerColor != nullptr && *winnerColor == ::Color::White) {
         bodyText = "White wins";
-      } else if (winnerColor.has_value() && *winnerColor == ::Color::Black) {
+      } else if (winnerColor != nullptr && *winnerColor == ::Color::Black) {
         bodyText = "Black wins";
       } else {
         bodyText = "Win";
@@ -1360,7 +1358,7 @@ void ChessView::drawBoard(
         closeFontSize, {245, 240, 240, 255});
   }
 
-  if (promotionPrompt.has_value()) {
+  if (promotionPrompt != nullptr) {
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), {0, 0, 0, 120});
 
     const Rectangle dialog = getPromotionDialogRect();

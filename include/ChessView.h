@@ -2,7 +2,6 @@
 #define CHESSVIEW_H
 
 #include <map>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -96,26 +95,24 @@ public:
   bool isRestartButtonClicked(float x, float y) const;
   bool isRestartConfirmYesClicked(float x, float y) const;
   bool isRestartConfirmNoClicked(float x, float y) const;
-  std::optional<int> getWindowSizeOptionClicked(float x, float y) const;
+  int getWindowSizeOptionClicked(float x, float y) const;
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
-  std::optional<PieceType> getPromotionOptionClicked(float x, float y) const;
-  std::optional<Position> screenToBoardSquare(float x, float y) const;
+  PieceType getPromotionOptionClicked(float x, float y) const;
+  bool screenToBoardSquare(float x, float y, Position &out) const;
   void drawPiece(PieceType type, ::Color color, float x, float y, float w,
                  float h, float sizeMultiplier = 1.0f);
-  void drawBoard(
-      const Board &board,
-      const std::optional<Position> &selectedSquare = std::nullopt,
-      const std::vector<Move> &legalMoves = {}, bool showRestartConfirm = false,
-      bool showWindowSizeDialog = false,
-      GameState gameState = GameState::Playing,
-      const std::optional<::Color> &winnerColor = std::nullopt,
-      const std::optional<CastlingTween> &castlingTween = std::nullopt,
-      const std::optional<DragPreview> &dragPreview = std::nullopt,
-      const std::optional<PromotionPrompt> &promotionPrompt = std::nullopt,
-      const std::optional<Position> &invalidHighlightSquare = std::nullopt,
-      const std::vector<BurningPieceInfo> &burningPieces = {},
-      const std::optional<CaptureCounterPopup> &captureCounterPopup =
-          std::nullopt);
+  void drawBoard(const Board &board, const Position *selectedSquare = nullptr,
+                 const std::vector<Move> &legalMoves = {},
+                 bool showRestartConfirm = false,
+                 bool showWindowSizeDialog = false,
+                 GameState gameState = GameState::Playing,
+                 const ::Color *winnerColor = nullptr,
+                 const CastlingTween *castlingTween = nullptr,
+                 const DragPreview *dragPreview = nullptr,
+                 const PromotionPrompt *promotionPrompt = nullptr,
+                 const Position *invalidHighlightSquare = nullptr,
+                 const std::vector<BurningPieceInfo> &burningPieces = {},
+                 const CaptureCounterPopup *captureCounterPopup = nullptr);
 
   void onMoveMade(Position from, Position to) override {
     (void)from;

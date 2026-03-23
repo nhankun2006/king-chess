@@ -1,67 +1,27 @@
 #include "ChessControllder.h"
 
 void ChessController::updateSelection(Position pos) {
-  selectedSquare_ = pos;
+  delete selectedSquare_;
+  selectedSquare_ = new Position(pos);
   selectedLegalMoves_ = game_->getLegalMoves(pos);
 }
 
 void ChessController::clearSelection() {
-  selectedSquare_.reset();
+  delete selectedSquare_;
+  selectedSquare_ = nullptr;
   selectedLegalMoves_.clear();
 }
 
+ChessController::~ChessController() {
+  delete selectedSquare_;
+  delete castlingTween_;
+  delete dragFromSquare_;
+  delete invalidHighlightSquare_;
+  delete captureCounterPopupSquare_;
+}
+
 void ChessController::run() {
-  Sound pieceMoveSound{};
-  bool pieceMoveSoundLoaded = false;
-  Sound captureSound{};
-  bool captureSoundLoaded = false;
-  constexpr float kMoveSoundVolume = 0.62f;
-  constexpr float kCaptureSoundVolume = 5.00f;
-
-  const char *appDir = GetApplicationDirectory();
-  const std::vector<std::string> soundCandidates = {
-      "assets/sounds/piece_move.mp3", "../assets/sounds/piece_move.mp3",
-      "../../assets/sounds/piece_move.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "assets/sounds/piece_move.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "../assets/sounds/piece_move.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "../../assets/sounds/piece_move.mp3"};
-
-  for (const auto &path : soundCandidates) {
-    if (path.empty() || !FileExists(path.c_str())) {
-      continue;
-    }
-    pieceMoveSound = LoadSound(path.c_str());
-    if (pieceMoveSound.frameCount > 0) {
-      SetSoundVolume(pieceMoveSound, kMoveSoundVolume);
-      pieceMoveSoundLoaded = true;
-      break;
-    }
-  }
-
-  const std::vector<std::string> captureSoundCandidates = {
-      "assets/sounds/capture.mp3", "../assets/sounds/capture.mp3",
-      "../../assets/sounds/capture.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "assets/sounds/capture.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "../assets/sounds/capture.mp3",
-      (appDir ? std::string(appDir) : std::string()) +
-          "../../assets/sounds/capture.mp3"};
-
-  for (const auto &path : captureSoundCandidates) {
-    if (path.empty() || !FileExists(path.c_str())) {
-      continue;
-    }
-    captureSound = LoadSound(path.c_str());
-    if (captureSound.frameCount > 0) {
-      SetSoundVolume(captureSound, kCaptureSoundVolume);
-      captureSoundLoaded = true;
-      break;
-    }
-  }
+  sound_.loadSounds();
 
   auto isCaptureMoveBeforeExecute = [&](const Move &move) -> bool {
     if (move.isEnPassant) {
@@ -79,36 +39,25 @@ void ChessController::run() {
     return targetPiece->getColor() != sourcePiece->getColor();
   };
 
-  auto playMoveSound = [&](bool isCapture) {
-    if (isCapture) {
-      if (captureSoundLoaded) {
-        PlaySound(captureSound);
-      } else if (pieceMoveSoundLoaded) {
-        PlaySound(pieceMoveSound);
-      }
-      return;
-    }
-    if (pieceMoveSoundLoaded) {
-      PlaySound(pieceMoveSound);
-    }
-  };
-
-  auto getActiveCastlingTween = [&]() -> std::optional<ChessView::CastlingTween> {
-    if (!castlingTween_.has_value()) {
-      return std::nullopt;
+  auto getActiveCastlingTween =
+      [&](ChessView::CastlingTween &outTween) -> bool {
+    if (castlingTween_ == nullptr) {
+      return false;
     }
 
-    ChessView::CastlingTween tween = *castlingTween_;
+    outTween = *castlingTween_;
     const double elapsed = GetTime() - castlingTweenStartTime_;
-    tween.progress = static_cast<float>(elapsed / castlingTweenDurationSeconds_);
-    if (tween.progress >= 1.0f) {
-      castlingTween_.reset();
-      return std::nullopt;
+    outTween.progress =
+        static_cast<float>(elapsed / castlingTweenDurationSeconds_);
+    if (outTween.progress >= 1.0f) {
+      delete castlingTween_;
+      castlingTween_ = nullptr;
+      return false;
     }
-    if (tween.progress < 0.0f) {
-      tween.progress = 0.0f;
+    if (outTween.progress < 0.0f) {
+      outTween.progress = 0.0f;
     }
-    return tween;
+    return true;
   };
 
   auto positionKey = [](Position pos) -> int { return pos.row * 8 + pos.col; };
@@ -151,31 +100,32 @@ void ChessController::run() {
   };
 
   auto drawFrame = [&]() {
-    std::optional<ChessView::DragPreview> dragPreview;
-    if (isDraggingPiece_ && dragFromSquare_.has_value() &&
+    ChessView::DragPreview dragPreviewVal;
+    ChessView::DragPreview *dragPreview = nullptr;
+    if (isDraggingPiece_ && dragFromSquare_ != nullptr &&
         dragPieceType_ != PieceType::None) {
-      ChessView::DragPreview preview;
-      preview.type = dragPieceType_;
-      preview.color = dragPieceColor_;
-      preview.from = *dragFromSquare_;
-      preview.mousePos = GetMousePosition();
-      dragPreview = preview;
+      dragPreviewVal.type = dragPieceType_;
+      dragPreviewVal.color = dragPieceColor_;
+      dragPreviewVal.from = *dragFromSquare_;
+      dragPreviewVal.mousePos = GetMousePosition();
+      dragPreview = &dragPreviewVal;
     }
 
-    std::optional<ChessView::PromotionPrompt> promotionPrompt;
+    ChessView::PromotionPrompt promotionPromptVal;
+    ChessView::PromotionPrompt *promotionPrompt = nullptr;
     if (promotionPromptOpen_) {
-      ChessView::PromotionPrompt prompt;
-      prompt.color = promotionPromptColor_;
-      promotionPrompt = prompt;
+      promotionPromptVal.color = promotionPromptColor_;
+      promotionPrompt = &promotionPromptVal;
     }
 
-    std::optional<Position> invalidHighlight;
-    if (invalidHighlightSquare_.has_value()) {
+    Position *invalidHighlight = nullptr;
+    if (invalidHighlightSquare_ != nullptr) {
       const double elapsed = GetTime() - invalidHighlightStartTime_;
       if (elapsed <= invalidHighlightDurationSeconds_) {
         invalidHighlight = invalidHighlightSquare_;
       } else {
-        invalidHighlightSquare_.reset();
+        delete invalidHighlightSquare_;
+        invalidHighlightSquare_ = nullptr;
       }
     }
 
@@ -190,61 +140,70 @@ void ChessController::run() {
       }
     }
 
-
-    std::optional<ChessView::CaptureCounterPopup> captureCounterPopup;
-    if (captureCounterPopupSquare_.has_value() && captureCounterPopupCount_ >= 2) {
+    ChessView::CaptureCounterPopup captureCounterPopupVal;
+    ChessView::CaptureCounterPopup *captureCounterPopup = nullptr;
+    if (captureCounterPopupSquare_ != nullptr &&
+        captureCounterPopupCount_ >= 2) {
       const double elapsed = GetTime() - captureCounterPopupStartTime_;
       const float progress =
           static_cast<float>(elapsed / captureCounterPopupDurationSeconds_);
       if (progress < 1.0f) {
-        ChessView::CaptureCounterPopup popup;
-        popup.pos = *captureCounterPopupSquare_;
-        popup.captureCount = captureCounterPopupCount_;
-        popup.progress = (progress < 0.0f) ? 0.0f : progress;
-        captureCounterPopup = popup;
+        captureCounterPopupVal.pos = *captureCounterPopupSquare_;
+        captureCounterPopupVal.captureCount = captureCounterPopupCount_;
+        captureCounterPopupVal.progress = (progress < 0.0f) ? 0.0f : progress;
+        captureCounterPopup = &captureCounterPopupVal;
       } else {
-        captureCounterPopupSquare_.reset();
+        delete captureCounterPopupSquare_;
+        captureCounterPopupSquare_ = nullptr;
         captureCounterPopupCount_ = 0;
       }
     }
 
     const GameState gameState = game_->getState();
-    std::optional<Color> winnerColor;
+    Color winnerColorVal = Color::White;
+    Color *winnerColor = nullptr;
     if (gameState == GameState::Checkmate) {
-      winnerColor = oppositeColor(game_->getCurrentTurn());
+      winnerColorVal = oppositeColor(game_->getCurrentTurn());
+      winnerColor = &winnerColorVal;
+    }
+
+    ChessView::CastlingTween activeTween;
+    ChessView::CastlingTween *activeTweenPtr = nullptr;
+    if (getActiveCastlingTween(activeTween)) {
+      activeTweenPtr = &activeTween;
     }
 
     view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                     restartConfirmOpen_, windowSizeDialogOpen_,
-                     gameState, winnerColor,
-                     getActiveCastlingTween(), dragPreview, promotionPrompt,
-                     invalidHighlight, burningPieces,
-                     captureCounterPopup);
+                     restartConfirmOpen_, windowSizeDialogOpen_, gameState,
+                     winnerColor, activeTweenPtr, dragPreview, promotionPrompt,
+                     invalidHighlight, burningPieces, captureCounterPopup);
   };
 
-  auto triggerInvalidMoveWarning = [&](const std::optional<Position> &fallbackSquare) {
+  auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {
     Position warningSquare = {-1, -1};
     const Color sideToMove = game_->getCurrentTurn();
     const Board &board = game_->getBoard();
 
     if (board.isInCheck(sideToMove)) {
       warningSquare = board.findKing(sideToMove);
-    } else if (fallbackSquare.has_value()) {
+    } else if (fallbackSquare != nullptr) {
       warningSquare = *fallbackSquare;
-    } else if (selectedSquare_.has_value()) {
+    } else if (selectedSquare_ != nullptr) {
       warningSquare = *selectedSquare_;
     }
 
     if (warningSquare.row >= 0 && warningSquare.row < 8 &&
         warningSquare.col >= 0 && warningSquare.col < 8) {
-      invalidHighlightSquare_ = warningSquare;
+      delete invalidHighlightSquare_;
+      invalidHighlightSquare_ = new Position(warningSquare);
       invalidHighlightStartTime_ = GetTime();
     }
   };
 
   auto stopDragging = [&]() {
     isDraggingPiece_ = false;
-    dragFromSquare_.reset();
+    delete dragFromSquare_;
+    dragFromSquare_ = nullptr;
     dragPieceType_ = PieceType::None;
   };
 
@@ -253,16 +212,16 @@ void ChessController::run() {
       const Vector2 mousePos = GetMousePosition();
 
       if (promotionPromptOpen_) {
-        const auto selectedPromotion =
+        const PieceType selectedPromotion =
             view_->getPromotionOptionClicked(mousePos.x, mousePos.y);
-        if (selectedPromotion.has_value()) {
+        if (selectedPromotion != PieceType::None) {
           for (const auto &move : pendingPromotionMoves_) {
-            if (move.promotion == *selectedPromotion) {
+            if (move.promotion == selectedPromotion) {
               const bool willCapture = isCaptureMoveBeforeExecute(move);
               if (!game_->makeMove(move)) {
                 continue;
               }
-              playMoveSound(willCapture);
+              sound_.playMoveSound(willCapture);
               const int captureCount = updateCaptureStreaks(move, willCapture);
               if (willCapture) {
                 if (captureCount >= 2) {
@@ -270,10 +229,12 @@ void ChessController::run() {
                   if (effectiveCaptureCount > 5) {
                     effectiveCaptureCount = 5;
                   }
-                  captureCounterPopupSquare_ = move.to;
+                  delete captureCounterPopupSquare_;
+                  captureCounterPopupSquare_ = new Position(move.to);
                   captureCounterPopupCount_ = captureCount;
                   captureCounterPopupDurationSeconds_ =
-                      1.00f + 0.08f * static_cast<float>(effectiveCaptureCount - 2);
+                      1.00f +
+                      0.08f * static_cast<float>(effectiveCaptureCount - 2);
                   captureCounterPopupStartTime_ = GetTime();
                 }
               }
@@ -285,7 +246,7 @@ void ChessController::run() {
             }
           }
         } else {
-          triggerInvalidMoveWarning(std::nullopt);
+          triggerInvalidMoveWarning(nullptr);
         }
 
         drawFrame();
@@ -296,7 +257,8 @@ void ChessController::run() {
         if (view_->isRestartConfirmYesClicked(mousePos.x, mousePos.y)) {
           game_->restart();
           pieceCaptureCounts_.clear();
-          captureCounterPopupSquare_.reset();
+          delete captureCounterPopupSquare_;
+          captureCounterPopupSquare_ = nullptr;
           captureCounterPopupCount_ = 0;
           clearSelection();
           stopDragging();
@@ -312,10 +274,10 @@ void ChessController::run() {
         if (view_->isWindowSizeDialogCloseClicked(mousePos.x, mousePos.y)) {
           windowSizeDialogOpen_ = false;
         } else {
-          const auto selectedSizeOpt =
+          const int selectedSizeOpt =
               view_->getWindowSizeOptionClicked(mousePos.x, mousePos.y);
-          if (selectedSizeOpt.has_value()) {
-            switch (*selectedSizeOpt) {
+          if (selectedSizeOpt >= 0) {
+            switch (selectedSizeOpt) {
             case 0:
               SetWindowSize(700, 512);
               break;
@@ -363,17 +325,17 @@ void ChessController::run() {
       }
 
       if (!handledUiClick) {
-        const auto clickedSquareOpt =
-            view_->screenToBoardSquare(mousePos.x, mousePos.y);
-        if (clickedSquareOpt.has_value()) {
-          const Position clickedSquare = *clickedSquareOpt;
+        Position clickedSquare;
+        if (view_->screenToBoardSquare(mousePos.x, mousePos.y, clickedSquare)) {
+          const Piece *clickedPiece =
+              game_->getBoard().getPieceAt(clickedSquare);
 
-          const Piece *clickedPiece = game_->getBoard().getPieceAt(clickedSquare);
-
-          if (clickedPiece && clickedPiece->getColor() == game_->getCurrentTurn()) {
+          if (clickedPiece &&
+              clickedPiece->getColor() == game_->getCurrentTurn()) {
             updateSelection(clickedSquare);
             isDraggingPiece_ = true;
-            dragFromSquare_ = clickedSquare;
+            delete dragFromSquare_;
+            dragFromSquare_ = new Position(clickedSquare);
             dragPieceType_ = clickedPiece->getType();
             dragPieceColor_ = clickedPiece->getColor();
           } else {
@@ -389,17 +351,20 @@ void ChessController::run() {
 
     if (isDraggingPiece_ && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
       const Vector2 mousePos = GetMousePosition();
-      const auto dropSquareOpt = view_->screenToBoardSquare(mousePos.x, mousePos.y);
+      Position dropSquare;
+      bool hasDropSquare =
+          view_->screenToBoardSquare(mousePos.x, mousePos.y, dropSquare);
 
-      std::optional<Move> attemptedMove;
-      std::optional<bool> attemptedMoveIsCapture;
+      Move attemptedMove{};
+      bool hasAttemptedMove = false;
+      bool attemptedMoveIsCapture = false;
+      bool hasAttemptedMoveIsCapture = false;
       const Piece *selectedPiece =
-          (selectedSquare_.has_value())
+          (selectedSquare_ != nullptr)
               ? game_->getBoard().getPieceAt(*selectedSquare_)
               : nullptr;
 
-      if (dropSquareOpt.has_value() && selectedPiece != nullptr) {
-        const Position dropSquare = *dropSquareOpt;
+      if (hasDropSquare && selectedPiece != nullptr) {
         std::vector<Move> candidateMoves;
 
         for (const auto &legalMove : selectedLegalMoves_) {
@@ -411,8 +376,10 @@ void ChessController::run() {
         }
 
         if (!candidateMoves.empty()) {
-          if (candidateMoves.size() == 1 || selectedPiece->getType() != PieceType::Pawn) {
+          if (candidateMoves.size() == 1 ||
+              selectedPiece->getType() != PieceType::Pawn) {
             attemptedMove = candidateMoves.front();
+            hasAttemptedMove = true;
           } else {
             bool hasPromotionChoices = false;
             for (const auto &move : candidateMoves) {
@@ -432,63 +399,69 @@ void ChessController::run() {
                 }
               }
               if (!pendingPromotionMoves_.empty()) {
-                attemptedMove.reset();
+                hasAttemptedMove = false;
               } else {
                 attemptedMove = candidateMoves.front();
+                hasAttemptedMove = true;
               }
             } else {
               attemptedMove = candidateMoves.front();
+              hasAttemptedMove = true;
             }
           }
         }
       }
 
-      if (!promotionPromptOpen_ && attemptedMove.has_value()) {
-        const bool willCapture = isCaptureMoveBeforeExecute(*attemptedMove);
-        if (!game_->makeMove(*attemptedMove)) {
-          attemptedMove.reset();
-          attemptedMoveIsCapture.reset();
+      if (!promotionPromptOpen_ && hasAttemptedMove) {
+        const bool willCapture = isCaptureMoveBeforeExecute(attemptedMove);
+        if (!game_->makeMove(attemptedMove)) {
+          hasAttemptedMove = false;
+          hasAttemptedMoveIsCapture = false;
         } else {
           attemptedMoveIsCapture = willCapture;
+          hasAttemptedMoveIsCapture = true;
         }
       }
 
-      if (!promotionPromptOpen_ && attemptedMove.has_value()) {
-        playMoveSound(attemptedMoveIsCapture.value_or(false));
+      if (!promotionPromptOpen_ && hasAttemptedMove) {
+        const bool wasCapture =
+            hasAttemptedMoveIsCapture ? attemptedMoveIsCapture : false;
+        sound_.playMoveSound(wasCapture);
         const int captureCount =
-            updateCaptureStreaks(*attemptedMove,
-                                 attemptedMoveIsCapture.value_or(false));
-        if (attemptedMoveIsCapture.value_or(false)) {
+            updateCaptureStreaks(attemptedMove, wasCapture);
+        if (wasCapture) {
           if (captureCount >= 2) {
             int effectiveCaptureCount = captureCount;
             if (effectiveCaptureCount > 5) {
               effectiveCaptureCount = 5;
             }
-            captureCounterPopupSquare_ = attemptedMove->to;
+            delete captureCounterPopupSquare_;
+            captureCounterPopupSquare_ = new Position(attemptedMove.to);
             captureCounterPopupCount_ = captureCount;
             captureCounterPopupDurationSeconds_ =
                 1.00f + 0.08f * static_cast<float>(effectiveCaptureCount - 2);
             captureCounterPopupStartTime_ = GetTime();
           }
         }
-        if (attemptedMove->isCastling && selectedPiece != nullptr &&
+        if (attemptedMove.isCastling && selectedPiece != nullptr &&
             selectedPiece->getType() == PieceType::King) {
           ChessView::CastlingTween tween;
           tween.color = selectedPiece->getColor();
-          tween.kingFrom = attemptedMove->from;
-          tween.kingTo = attemptedMove->to;
-          const int rookFromCol = (attemptedMove->to.col == 6) ? 7 : 0;
-          const int rookToCol = (attemptedMove->to.col == 6) ? 5 : 3;
-          tween.rookFrom = {attemptedMove->from.row, rookFromCol};
-          tween.rookTo = {attemptedMove->from.row, rookToCol};
+          tween.kingFrom = attemptedMove.from;
+          tween.kingTo = attemptedMove.to;
+          const int rookFromCol = (attemptedMove.to.col == 6) ? 7 : 0;
+          const int rookToCol = (attemptedMove.to.col == 6) ? 5 : 3;
+          tween.rookFrom = {attemptedMove.from.row, rookFromCol};
+          tween.rookTo = {attemptedMove.from.row, rookToCol};
           tween.progress = 0.0f;
-          castlingTween_ = tween;
+          delete castlingTween_;
+          castlingTween_ = new ChessView::CastlingTween(tween);
           castlingTweenStartTime_ = GetTime();
         }
       } else if (!promotionPromptOpen_) {
-        if (dropSquareOpt.has_value() && selectedSquare_.has_value() &&
-            *dropSquareOpt != *selectedSquare_) {
-          triggerInvalidMoveWarning(dropSquareOpt);
+        if (hasDropSquare && selectedSquare_ != nullptr &&
+            !(dropSquare == *selectedSquare_)) {
+          triggerInvalidMoveWarning(&dropSquare);
         }
       }
 
@@ -499,12 +472,5 @@ void ChessController::run() {
     }
 
     drawFrame();
-  }
-
-  if (pieceMoveSoundLoaded) {
-    UnloadSound(pieceMoveSound);
-  }
-  if (captureSoundLoaded) {
-    UnloadSound(captureSound);
   }
 }

@@ -6,7 +6,6 @@
 #include "Piece.h"
 #include <memory>
 #include <string>
-#include <vector>
 
 class Board {
 private:
