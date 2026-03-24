@@ -6,10 +6,12 @@
 #include "ChessSound.h"
 #include "ChessView.h"
 #include "Game.h"
+#include "UIConfig.h"
 
 int main() {
   SetConfigFlags(FLAG_VSYNC_HINT);
-  InitWindow(700, 512, "King Chess");
+  InitWindow(ui::Window::kInitialWidth, ui::Window::kInitialHeight,
+             "King Chess");
   if (!IsWindowReady()) {
     std::fprintf(stderr, "InitWindow failed\n");
     return 1;
@@ -22,7 +24,7 @@ int main() {
     ChangeDirectory(appDir);
   }
 
-  SetTargetFPS(60);
+  SetTargetFPS(ui::Window::kTargetFps);
   Game game;
   ChessView view;
   ChessSound sound;

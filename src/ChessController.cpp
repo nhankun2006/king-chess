@@ -1,5 +1,7 @@
 #include "ChessControllder.h"
 
+#include "UIConfig.h"
+
 void ChessController::updateSelection(Position pos) {
   delete selectedSquare_;
   selectedSquare_ = new Position(pos);
@@ -213,8 +215,11 @@ void ChessController::run() {
                   captureCounterPopupSquare_ = new Position(move.to);
                   captureCounterPopupCount_ = captureCount;
                   captureCounterPopupDurationSeconds_ =
-                      1.00f +
-                      0.08f * static_cast<float>(effectiveCaptureCount - 2);
+                      ui::Animation::kCapturePopupDurationBaseFromMove +
+                      ui::Animation::kCapturePopupDurationPerExtraCapture *
+                          static_cast<float>(
+                              effectiveCaptureCount -
+                              ui::CapturePopup::kStartCaptureCount);
                   captureCounterPopupStartTime_ = GetTime();
                 }
               }
@@ -257,21 +262,10 @@ void ChessController::run() {
           const int selectedSizeOpt =
               view_->getWindowSizeOptionClicked(mousePos.x, mousePos.y);
           if (selectedSizeOpt >= 0) {
-            switch (selectedSizeOpt) {
-            case 0:
-              SetWindowSize(700, 512);
-              break;
-            case 1:
-              SetWindowSize(900, 650);
-              break;
-            case 2:
-              SetWindowSize(1100, 780);
-              break;
-            case 3:
-              SetWindowSize(1300, 920);
-              break;
-            default:
-              break;
+            if (selectedSizeOpt < ui::Window::kSizePresetCount) {
+              const ui::WindowPreset preset =
+                  ui::Window::kSizePresets[selectedSizeOpt];
+              SetWindowSize(preset.width, preset.height);
             }
             windowSizeDialogOpen_ = false;
           }
@@ -420,7 +414,10 @@ void ChessController::run() {
             captureCounterPopupSquare_ = new Position(attemptedMove.to);
             captureCounterPopupCount_ = captureCount;
             captureCounterPopupDurationSeconds_ =
-                1.00f + 0.08f * static_cast<float>(effectiveCaptureCount - 2);
+                ui::Animation::kCapturePopupDurationBaseFromMove +
+                ui::Animation::kCapturePopupDurationPerExtraCapture *
+                    static_cast<float>(effectiveCaptureCount -
+                                       ui::CapturePopup::kStartCaptureCount);
             captureCounterPopupStartTime_ = GetTime();
           }
         }

@@ -6,6 +6,7 @@
 
 #include "Game.h"
 #include "ChessView.h"
+#include "UIConfig.h"
 
 class ChessController {
 private:
@@ -17,7 +18,7 @@ private:
   bool windowSizeDialogOpen_ = false;
   CastlingTween *castlingTween_ = nullptr;
   double castlingTweenStartTime_ = 0.0;
-  float castlingTweenDurationSeconds_ = 0.22f;
+  float castlingTweenDurationSeconds_ = ui::Animation::kCastlingTweenDurationSeconds;
   bool isDraggingPiece_ = false;
   Position *dragFromSquare_ = nullptr;
   PieceType dragPieceType_ = PieceType::None;
@@ -27,12 +28,12 @@ private:
   std::vector<Move> pendingPromotionMoves_;
   Position *invalidHighlightSquare_ = nullptr;
   double invalidHighlightStartTime_ = 0.0;
-  float invalidHighlightDurationSeconds_ = 0.55f;
+  float invalidHighlightDurationSeconds_ = ui::Animation::kInvalidHighlightDurationSeconds;
   std::map<int, int> pieceCaptureCounts_;
   Position *captureCounterPopupSquare_ = nullptr;
   int captureCounterPopupCount_ = 0;
   double captureCounterPopupStartTime_ = 0.0;
-  float captureCounterPopupDurationSeconds_ = 1.05f;
+  float captureCounterPopupDurationSeconds_ = ui::Animation::kCapturePopupDurationSeconds;
 
   void updateSelection(Position pos);
   void clearSelection();
