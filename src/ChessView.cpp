@@ -259,43 +259,21 @@ Rectangle ChessView::getBoardGridRect() const {
 }
 
 Rectangle ChessView::getBoardRenderRect() const {
-  const float screenWidth = static_cast<float>(GetScreenWidth());
-  const float screenHeight = static_cast<float>(GetScreenHeight());
-
-  float maxBoardWidth = screenWidth - ui::Board::kMinPanelWidth;
-  if (maxBoardWidth < ui::Board::kMinBoardSize) {
-    maxBoardWidth = screenWidth;
-  }
-
-  float boardSize =
-      (screenHeight < maxBoardWidth) ? screenHeight : maxBoardWidth;
-  if (boardSize < ui::Board::kMinBoardSize) {
-    boardSize = (screenHeight < screenWidth) ? screenHeight : screenWidth;
-  }
-
-  return {0.0f, 0.0f, boardSize, boardSize};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return m.boardRect;
 }
 
 Rectangle ChessView::getRightPanelRect() const {
-  const Rectangle boardRect = getBoardRenderRect();
-  const float panelX = boardRect.x + boardRect.width;
-  float panelWidth = static_cast<float>(GetScreenWidth()) - panelX;
-  if (panelWidth < 0.0f) {
-    panelWidth = 0.0f;
-  }
-
-  return {panelX, 0.0f, panelWidth, static_cast<float>(GetScreenHeight())};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return m.rightPanelRect;
 }
 
 float ChessView::getUiScale() const {
-  const float base = getBoardRenderRect().width / ui::Board::kUiBaseWidth;
-  if (base < ui::Board::kUiScaleMin) {
-    return ui::Board::kUiScaleMin;
-  }
-  if (base > ui::Board::kUiScaleMax) {
-    return ui::Board::kUiScaleMax;
-  }
-  return base;
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return m.uiScale;
 }
 
 Rectangle ChessView::getSettingsButtonRect() const {
@@ -304,117 +282,113 @@ Rectangle ChessView::getSettingsButtonRect() const {
     return {0.0f, 0.0f, 0.0f, 0.0f};
   }
 
-  const float uiScale = getUiScale();
-  const float buttonSize = ui::IconButtons::kSize * uiScale;
-  const float buttonGap = ui::IconButtons::kGap * uiScale;
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const float buttonSize = ui::AutoLayout::IconButtonSize(m);
+  const float buttonGap = ui::AutoLayout::IconButtonGap(m);
   const float totalWidth = buttonSize * 3.0f + buttonGap * 2.0f;
   const float startX = panel.x + (panel.width - totalWidth) * 0.5f;
-  const float startY = ui::IconButtons::kStartY *
-                       (getBoardRenderRect().height / ui::Board::kUiBaseWidth);
+  const float startY = ui::AutoLayout::IconButtonStartY(m);
   return {startX, startY, buttonSize, buttonSize};
 }
 
 Rectangle ChessView::getRotateButtonRect() const {
   const Rectangle settingsButton = getSettingsButtonRect();
-  return {settingsButton.x + settingsButton.width +
-              ui::IconButtons::kGap * getUiScale(),
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return {settingsButton.x + settingsButton.width + ui::AutoLayout::IconButtonGap(m),
           settingsButton.y, settingsButton.width, settingsButton.height};
 }
 
 Rectangle ChessView::getRestartButtonRect() const {
   const Rectangle rotateButton = getRotateButtonRect();
-  return {rotateButton.x + rotateButton.width + ui::IconButtons::kGap * getUiScale(),
-          rotateButton.y, rotateButton.width, rotateButton.height};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return {rotateButton.x + rotateButton.width + ui::AutoLayout::IconButtonGap(m),
+           rotateButton.y, rotateButton.width, rotateButton.height};
 }
 
 Rectangle ChessView::getRestartConfirmDialogRect() const {
-  const float uiScale = getUiScale();
-  float dialogWidth = ui::Dialog::kRestartWidth * uiScale;
-  const float dialogHeight = ui::Dialog::kRestartHeight * uiScale;
-  const float maxWidth = static_cast<float>(GetScreenWidth()) - ui::Dialog::kScreenMargin;
-  if (dialogWidth > maxWidth) {
-    dialogWidth = maxWidth;
-  }
-  const float x = (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f;
-  const float y = (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f;
-  return {x, y, dialogWidth, dialogHeight};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return ui::AutoLayout::RestartDialogRect(m);
 }
 
 Rectangle ChessView::getRestartConfirmYesButtonRect() const {
   const Rectangle dialog = getRestartConfirmDialogRect();
-  return {dialog.x + ui::Dialog::kRestartYesX,
-          dialog.y + dialog.height - ui::Dialog::kRestartYesBottom,
-          ui::Dialog::kRestartButtonWidth, ui::Dialog::kRestartButtonHeight};
+  constexpr float kInsetXRatio = 34.0f / 320.0f;
+  constexpr float kBottomRatio = 52.0f / 150.0f;
+  constexpr float kWidthRatio = 110.0f / 320.0f;
+  constexpr float kHeightRatio = 34.0f / 150.0f;
+  return {dialog.x + dialog.width * kInsetXRatio,
+          dialog.y + dialog.height - dialog.height * kBottomRatio,
+          dialog.width * kWidthRatio, dialog.height * kHeightRatio};
 }
 
 Rectangle ChessView::getRestartConfirmNoButtonRect() const {
   const Rectangle dialog = getRestartConfirmDialogRect();
-  return {dialog.x + dialog.width - ui::Dialog::kRestartYesX -
-              ui::Dialog::kRestartButtonWidth,
-          dialog.y + dialog.height - ui::Dialog::kRestartYesBottom,
-          ui::Dialog::kRestartButtonWidth, ui::Dialog::kRestartButtonHeight};
+  constexpr float kInsetXRatio = 34.0f / 320.0f;
+  constexpr float kBottomRatio = 52.0f / 150.0f;
+  constexpr float kWidthRatio = 110.0f / 320.0f;
+  constexpr float kHeightRatio = 34.0f / 150.0f;
+  const float buttonW = dialog.width * kWidthRatio;
+  return {dialog.x + dialog.width - dialog.width * kInsetXRatio - buttonW,
+          dialog.y + dialog.height - dialog.height * kBottomRatio, buttonW,
+          dialog.height * kHeightRatio};
 }
 
 Rectangle ChessView::getWindowSizeDialogRect() const {
-  const float uiScale = getUiScale();
-  float dialogWidth = ui::Dialog::kWindowSizeWidth * uiScale;
-  const float dialogHeight = ui::Dialog::kWindowSizeHeight * uiScale;
-  const float maxWidth = static_cast<float>(GetScreenWidth()) - ui::Dialog::kScreenMargin;
-  if (dialogWidth > maxWidth) {
-    dialogWidth = maxWidth;
-  }
-
-  const float x = (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f;
-  const float y = (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f;
-  return {x, y, dialogWidth, dialogHeight};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return ui::AutoLayout::WindowSizeDialogRect(m);
 }
 
 Rectangle ChessView::getWindowSizeOptionRect(int index) const {
   const Rectangle dialog = getWindowSizeDialogRect();
-  const float uiScale = getUiScale();
-  const float optionHeight = ui::Dialog::kWindowOptionHeight * uiScale;
-  const float gap = ui::Dialog::kWindowOptionGap * uiScale;
-  const float startY = dialog.y + ui::Dialog::kWindowOptionStartY * uiScale;
-  return {dialog.x + ui::Dialog::kWindowOptionPadX * uiScale,
+  constexpr float kHeightRatio = 40.0f / 270.0f;
+  constexpr float kGapRatio = 10.0f / 270.0f;
+  constexpr float kStartYRatio = 54.0f / 270.0f;
+  constexpr float kPadXRatio = 24.0f / 340.0f;
+  const float optionHeight = dialog.height * kHeightRatio;
+  const float gap = dialog.height * kGapRatio;
+  const float startY = dialog.y + dialog.height * kStartYRatio;
+  const float padX = dialog.width * kPadXRatio;
+  return {dialog.x + padX,
           startY + static_cast<float>(index) * (optionHeight + gap),
-          dialog.width - 2.0f * ui::Dialog::kWindowOptionPadX * uiScale,
-          optionHeight};
+          dialog.width - 2.0f * padX, optionHeight};
 }
 
 Rectangle ChessView::getWindowSizeCloseButtonRect() const {
   const Rectangle dialog = getWindowSizeDialogRect();
-  const float uiScale = getUiScale();
-  const float buttonSize = ui::Dialog::kWindowCloseButtonSize * uiScale;
-  return {dialog.x + dialog.width - buttonSize -
-              ui::Dialog::kWindowCloseMargin * uiScale,
-          dialog.y + ui::Dialog::kWindowCloseMargin * uiScale, buttonSize,
+  constexpr float kSizeRatio = 28.0f / 340.0f;
+  constexpr float kMarginRatio = 10.0f / 340.0f;
+  const float buttonSize = dialog.width * kSizeRatio;
+  const float margin = dialog.width * kMarginRatio;
+  return {dialog.x + dialog.width - buttonSize - margin,
+          dialog.y + margin, buttonSize,
           buttonSize};
 }
 
 Rectangle ChessView::getPromotionDialogRect() const {
-  const float uiScale = getUiScale();
-  float dialogWidth = ui::Dialog::kPromotionWidth * uiScale;
-  const float dialogHeight = ui::Dialog::kPromotionHeight * uiScale;
-  const float maxWidth = static_cast<float>(GetScreenWidth()) - ui::Dialog::kScreenMargin;
-  if (dialogWidth > maxWidth) {
-    dialogWidth = maxWidth;
-  }
-  const float x = (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f;
-  const float y = (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f;
-  return {x, y, dialogWidth, dialogHeight};
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return ui::AutoLayout::PromotionDialogRect(m);
 }
 
 Rectangle ChessView::getPromotionOptionRect(int index) const {
   const Rectangle dialog = getPromotionDialogRect();
-  const float uiScale = getUiScale();
-  const float gap = ui::Dialog::kPromotionGap * uiScale;
+  constexpr float kGapRatio = 10.0f / 320.0f;
+  constexpr float kTotalPadRatio = 36.0f / 320.0f;
+  constexpr float kStartXRatio = 18.0f / 320.0f;
+  constexpr float kYRatio = 52.0f / 130.0f;
+  const float gap = dialog.width * kGapRatio;
   const float totalGap =
       gap * static_cast<float>(ui::Dialog::kPromotionOptionCount - 1);
   const float buttonSize =
-      (dialog.width - ui::Dialog::kPromotionTotalPad * uiScale - totalGap) /
+      (dialog.width - dialog.width * kTotalPadRatio - totalGap) /
       static_cast<float>(ui::Dialog::kPromotionOptionCount);
-  const float startX = dialog.x + ui::Dialog::kPromotionStartX * uiScale;
-  const float y = dialog.y + ui::Dialog::kPromotionY * uiScale;
+  const float startX = dialog.x + dialog.width * kStartXRatio;
+  const float y = dialog.y + dialog.height * kYRatio;
   return {startX + static_cast<float>(index) * (buttonSize + gap), y,
           buttonSize, buttonSize};
 }
@@ -1276,25 +1250,18 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
                   ui::Overlay::kGameOver);
 
-    const float uiScale = getUiScale();
-    float dialogWidth = ui::GameOverDialog::kWidth * uiScale;
-    const float dialogHeight = ui::GameOverDialog::kHeight * uiScale;
-    const float maxWidth =
-        static_cast<float>(GetScreenWidth()) - ui::Dialog::kScreenMargin;
-    if (dialogWidth > maxWidth) {
-      dialogWidth = maxWidth;
-    }
-    const Rectangle dialog = {
-        (static_cast<float>(GetScreenWidth()) - dialogWidth) * 0.5f,
-        (static_cast<float>(GetScreenHeight()) - dialogHeight) * 0.5f,
-        dialogWidth, dialogHeight};
+    const ui::AutoLayout::Metrics m =
+        ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+    const Rectangle dialog = ui::AutoLayout::GameOverDialogRect(m);
+
+    const float heightScale = dialog.height / ui::GameOverDialog::kHeight;
 
     const int titleFontSize =
-        static_cast<int>(ui::GameOverDialog::kTitleFont * uiScale);
+        static_cast<int>(ui::GameOverDialog::kTitleFont * heightScale);
     const int bodyFontSize =
-        static_cast<int>(ui::GameOverDialog::kBodyFont * uiScale);
+        static_cast<int>(ui::GameOverDialog::kBodyFont * heightScale);
     const int hintFontSize =
-        static_cast<int>(ui::GameOverDialog::kHintFont * uiScale);
+        static_cast<int>(ui::GameOverDialog::kHintFont * heightScale);
 
     const char *titleText =
         (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
@@ -1326,18 +1293,18 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
 
     DrawText(titleText,
              static_cast<int>(dialog.x + (dialog.width - titleWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kTitleY * uiScale),
+             static_cast<int>(dialog.y + ui::GameOverDialog::kTitleY * heightScale),
              titleFontSize,
              (gameState == GameState::Checkmate)
                  ? GetColor(ui::GameOverDialog::kCheckmateTitleColor)
                  : GetColor(ui::GameOverDialog::kStalemateTitleColor));
     DrawText(bodyText,
              static_cast<int>(dialog.x + (dialog.width - bodyWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kBodyY * uiScale),
+             static_cast<int>(dialog.y + ui::GameOverDialog::kBodyY * heightScale),
              bodyFontSize, ui::GameOverDialog::kBody);
     DrawText(hintText,
              static_cast<int>(dialog.x + (dialog.width - hintWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kHintY * uiScale),
+             static_cast<int>(dialog.y + ui::GameOverDialog::kHintY * heightScale),
              hintFontSize, ui::GameOverDialog::kHint);
   }
 

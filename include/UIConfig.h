@@ -24,6 +24,145 @@ static constexpr WindowPreset kSizePresets[kSizePresetCount] = {
     {1300, 920, "1300 x 920"}};
 } // namespace Window
 
+// -----------------------------------------------------------------------------
+// Editable section: collaborators should tune these values only.
+// -----------------------------------------------------------------------------
+namespace LayoutTuning {
+constexpr float kPanelWidthRatio = 0.27f;
+constexpr float kPanelMinWidth = 180.0f;
+constexpr float kBoardMinSize = 240.0f;
+
+constexpr float kUiScaleRefBoard = 512.0f;
+constexpr float kUiScaleMin = 0.85f;
+constexpr float kUiScaleMax = 1.35f;
+
+constexpr float kScreenMarginRatio = 0.08f;
+constexpr float kScreenMarginMin = 28.0f;
+} // namespace LayoutTuning
+
+// -----------------------------------------------------------------------------
+// Auto layout black-box: derived geometry should come from these helpers.
+// -----------------------------------------------------------------------------
+namespace AutoLayout {
+
+struct Metrics {
+  float screenWidth;
+  float screenHeight;
+  float uiScale;
+  float screenMargin;
+  Rectangle boardRect;
+  Rectangle rightPanelRect;
+};
+
+constexpr float Clamp(float value, float minValue, float maxValue) {
+  return (value < minValue)
+             ? minValue
+             : ((value > maxValue) ? maxValue : value);
+}
+
+inline Metrics ComputeMetrics(int screenWidth, int screenHeight) {
+  Metrics m{};
+  m.screenWidth = static_cast<float>(screenWidth);
+  m.screenHeight = static_cast<float>(screenHeight);
+
+  float panelWidth = m.screenWidth * LayoutTuning::kPanelWidthRatio;
+  if (panelWidth < LayoutTuning::kPanelMinWidth) {
+    panelWidth = LayoutTuning::kPanelMinWidth;
+  }
+
+  const float maxPanelWidth = m.screenWidth - LayoutTuning::kBoardMinSize;
+  if (panelWidth > maxPanelWidth) {
+    panelWidth = maxPanelWidth;
+  }
+  if (panelWidth < 0.0f) {
+    panelWidth = 0.0f;
+  }
+
+  float boardSize = m.screenWidth - panelWidth;
+  if (boardSize > m.screenHeight) {
+    boardSize = m.screenHeight;
+  }
+  if (boardSize < LayoutTuning::kBoardMinSize) {
+    boardSize = (m.screenWidth < m.screenHeight) ? m.screenWidth : m.screenHeight;
+    panelWidth = m.screenWidth - boardSize;
+    if (panelWidth < 0.0f) {
+      panelWidth = 0.0f;
+    }
+  }
+
+  m.boardRect = {0.0f, 0.0f, boardSize, boardSize};
+  m.rightPanelRect = {boardSize, 0.0f, panelWidth, m.screenHeight};
+
+  const float minSide =
+      (m.screenWidth < m.screenHeight) ? m.screenWidth : m.screenHeight;
+  const float marginFromRatio = minSide * LayoutTuning::kScreenMarginRatio;
+  m.screenMargin = (marginFromRatio > LayoutTuning::kScreenMarginMin)
+                       ? marginFromRatio
+                       : LayoutTuning::kScreenMarginMin;
+
+  const float rawScale = m.boardRect.width / LayoutTuning::kUiScaleRefBoard;
+  m.uiScale = Clamp(rawScale, LayoutTuning::kUiScaleMin,
+                    LayoutTuning::kUiScaleMax);
+  return m;
+}
+
+inline Rectangle CenteredDialogRect(const Metrics &m, float widthRatio,
+                                    float heightRatio) {
+  float width = m.screenWidth * widthRatio;
+  float height = m.screenHeight * heightRatio;
+  const float maxWidth = m.screenWidth - m.screenMargin;
+  const float maxHeight = m.screenHeight - m.screenMargin;
+  if (width > maxWidth) {
+    width = maxWidth;
+  }
+  if (height > maxHeight) {
+    height = maxHeight;
+  }
+  return {(m.screenWidth - width) * 0.5f, (m.screenHeight - height) * 0.5f,
+          width, height};
+}
+
+inline float IconButtonSize(const Metrics &m) {
+  constexpr float kRatio = 44.0f / 512.0f;
+  return m.boardRect.width * kRatio;
+}
+
+inline float IconButtonGap(const Metrics &m) {
+  constexpr float kRatio = 12.0f / 512.0f;
+  return m.boardRect.width * kRatio;
+}
+
+inline float IconButtonStartY(const Metrics &m) {
+  constexpr float kRatio = 236.0f / 512.0f;
+  return m.boardRect.height * kRatio;
+}
+
+inline Rectangle RestartDialogRect(const Metrics &m) {
+  constexpr float kWidthRatio = 320.0f / 700.0f;
+  constexpr float kHeightRatio = 150.0f / 512.0f;
+  return CenteredDialogRect(m, kWidthRatio, kHeightRatio);
+}
+
+inline Rectangle WindowSizeDialogRect(const Metrics &m) {
+  constexpr float kWidthRatio = 340.0f / 700.0f;
+  constexpr float kHeightRatio = 270.0f / 512.0f;
+  return CenteredDialogRect(m, kWidthRatio, kHeightRatio);
+}
+
+inline Rectangle PromotionDialogRect(const Metrics &m) {
+  constexpr float kWidthRatio = 320.0f / 700.0f;
+  constexpr float kHeightRatio = 130.0f / 512.0f;
+  return CenteredDialogRect(m, kWidthRatio, kHeightRatio);
+}
+
+inline Rectangle GameOverDialogRect(const Metrics &m) {
+  constexpr float kWidthRatio = 360.0f / 700.0f;
+  constexpr float kHeightRatio = 168.0f / 512.0f;
+  return CenteredDialogRect(m, kWidthRatio, kHeightRatio);
+}
+
+} // namespace AutoLayout
+
 namespace Board {
 constexpr int kSquaresPerSide = 8;
 constexpr int kMaxIndex = kSquaresPerSide - 1;
@@ -33,12 +172,12 @@ constexpr float kGridTopPx = 7.0f;
 constexpr float kGridRightPx = 7.0f;
 constexpr float kGridBottomPx = 7.0f;
 
-constexpr float kMinPanelWidth = 180.0f;
-constexpr float kMinBoardSize = 240.0f;
+constexpr float kMinPanelWidth = LayoutTuning::kPanelMinWidth;
+constexpr float kMinBoardSize = LayoutTuning::kBoardMinSize;
 
-constexpr float kUiBaseWidth = 512.0f;
-constexpr float kUiScaleMin = 0.85f;
-constexpr float kUiScaleMax = 1.35f;
+constexpr float kUiBaseWidth = LayoutTuning::kUiScaleRefBoard;
+constexpr float kUiScaleMin = LayoutTuning::kUiScaleMin;
+constexpr float kUiScaleMax = LayoutTuning::kUiScaleMax;
 } // namespace Board
 
 namespace Piece {
