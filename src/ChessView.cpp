@@ -4,6 +4,11 @@
 
 #include "UIConfig.h"
 
+namespace {
+constexpr PieceType kPromotionOptions[ui::Dialog::kPromotionOptionCount] = {
+    PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
+}
+
 ChessView::~ChessView() {
   if (boardTexture_.id != 0) {
     UnloadTexture(boardTexture_);
@@ -393,6 +398,34 @@ Rectangle ChessView::getPromotionOptionRect(int index) const {
           buttonSize, buttonSize};
 }
 
+int ChessView::boardToDisplayIndex(int boardIndex) const {
+  return isBoardFlipped_ ? (ui::Board::kMaxIndex - boardIndex) : boardIndex;
+}
+
+Rectangle ChessView::getDisplaySquareRect(int displayRow, int displayCol) const {
+  const Rectangle grid = getBoardGridRect();
+  const float cellW = grid.width / static_cast<float>(ui::Board::kSquaresPerSide);
+  const float cellH =
+      grid.height / static_cast<float>(ui::Board::kSquaresPerSide);
+  return {grid.x + static_cast<float>(displayCol) * cellW,
+          grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH};
+}
+
+Rectangle ChessView::getBoardSquareRect(Position boardPos) const {
+  return getDisplaySquareRect(boardToDisplayIndex(boardPos.row),
+                              boardToDisplayIndex(boardPos.col));
+}
+
+float ChessView::clamp01(float value) {
+  if (value < 0.0f) {
+    return 0.0f;
+  }
+  if (value > 1.0f) {
+    return 1.0f;
+  }
+  return value;
+}
+
 bool ChessView::isSettingsButtonClicked(float x, float y) const {
   const Rectangle settingsButton = getSettingsButtonRect();
   if (settingsButton.width <= 0.0f || settingsButton.height <= 0.0f) {
@@ -437,13 +470,11 @@ int ChessView::getWindowSizeOptionClicked(float x, float y) const {
 }
 
 PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
-  const PieceType options[ui::Dialog::kPromotionOptionCount] = {
-      PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
   for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
     const Rectangle option = getPromotionOptionRect(index);
     if (x >= option.x && x <= option.x + option.width && y >= option.y &&
         y <= option.y + option.height) {
-      return options[index];
+      return kPromotionOptions[index];
     }
   }
   return PieceType::None;
@@ -529,19 +560,125 @@ void ChessView::drawPiece(PieceType type, ::ChessColor color, float x, float y,
   DrawTexturePro(texture, src, dst, {0.0f, 0.0f}, 0.0f, {255, 255, 255, 255});
 }
 
-void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
-                          const std::vector<Move> &legalMoves,
-                          bool showRestartConfirm, bool showWindowSizeDialog,
-                          GameState gameState, const ::ChessColor *winnerColor,
-                          const CastlingTween *castlingTween,
-                          const DragPreview *dragPreview,
-                          const ::ChessColor *promotionColor,
-                          const Position *invalidHighlightSquare,
-                          const std::vector<CaptureEffect> &burningPieces,
-                          const CaptureEffect *captureCounterPopup) {
-  BeginDrawing();
-  ClearBackground({0, 0, 0, 255});
+namespace {
 
+int getInitialCount(PieceType type) {
+  switch (type) {
+  case PieceType::Pawn:
+    return ui::Board::kSquaresPerSide;
+  case PieceType::Knight:
+  case PieceType::Bishop:
+  case PieceType::Rook:
+    return 2;
+  case PieceType::Queen:
+  case PieceType::King:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
+float getBoardPieceScale(PieceType type) {
+  switch (type) {
+  case PieceType::King:
+  case PieceType::Queen:
+  case PieceType::Bishop:
+    return ui::Piece::kBoardScaleLarge;
+  default:
+    return 1.0f;
+  }
+}
+
+float getCapturedPieceSizeFactor(PieceType type) {
+  switch (type) {
+  case PieceType::King:
+  case PieceType::Queen:
+  case PieceType::Bishop:
+    return ui::Piece::kCapturedScaleLarge;
+  default:
+    return 1.0f;
+  }
+}
+
+const PieceType *capturedPieceOrder() {
+  static const PieceType order[5] = {
+      PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight,
+      PieceType::Pawn};
+  return order;
+}
+
+constexpr int kCapturedPieceOrderCount = 5;
+
+struct CapturedSectionLayout {
+  float iconW = 0.0f;
+  float iconH = 0.0f;
+  float gap = 0.0f;
+  int safeMaxPerRow = 1;
+  int totalCaptured = 0;
+  int rows = 0;
+  int contentHeight = 0;
+};
+
+CapturedSectionLayout computeCapturedSectionLayout(
+    int sectionWidth, const std::map<PieceType, int> &captured, float uiScale,
+    float boardWidth, int screenWidth) {
+  CapturedSectionLayout layout{};
+
+  float capturedScale = boardWidth / ui::Board::kUiBaseWidth;
+  if (capturedScale < ui::RightPanel::kCapturedScaleMin) {
+    capturedScale = ui::RightPanel::kCapturedScaleMin;
+  }
+  if (capturedScale > ui::RightPanel::kCapturedScaleMax) {
+    capturedScale = ui::RightPanel::kCapturedScaleMax;
+  }
+
+  const bool compactColumns =
+      screenWidth <= ui::RightPanel::kCompactColumnsMaxScreenWidth;
+  layout.iconW =
+      (compactColumns ? ui::RightPanel::kIconSizeCompact
+                      : ui::RightPanel::kIconSizeRegular) *
+      capturedScale;
+  layout.iconH =
+      (compactColumns ? ui::RightPanel::kIconSizeCompact
+                      : ui::RightPanel::kIconSizeRegular) *
+      capturedScale;
+  layout.gap =
+      (compactColumns ? ui::RightPanel::kIconGapCompact
+                      : ui::RightPanel::kIconGapRegular) *
+      capturedScale;
+
+  const int maxPerRow =
+      (sectionWidth - static_cast<int>(ui::RightPanel::kGridInsetWidth * uiScale)) /
+      static_cast<int>(layout.iconW + layout.gap);
+  layout.safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
+
+  const PieceType *pieceOrder = capturedPieceOrder();
+  for (int index = 0; index < kCapturedPieceOrderCount; ++index) {
+    layout.totalCaptured += captured.at(pieceOrder[index]);
+  }
+
+  if (layout.totalCaptured == 0) {
+    layout.contentHeight = static_cast<int>(ui::RightPanel::kEmptyHeight * uiScale);
+    return layout;
+  }
+
+  layout.rows = (layout.totalCaptured + layout.safeMaxPerRow - 1) /
+                layout.safeMaxPerRow;
+  layout.contentHeight =
+      static_cast<int>(ui::RightPanel::kSectionTopPadding * uiScale) +
+      layout.rows * static_cast<int>(layout.iconH + layout.gap);
+  return layout;
+}
+
+} // namespace
+
+void ChessView::drawBoardLayers(const Board &board, const Position *selectedSquare,
+                                const std::vector<Move> &legalMoves,
+                                const CastlingTween *castlingTween,
+                                const DragPreview *dragPreview,
+                                const Position *invalidHighlightSquare,
+                                const std::vector<CaptureEffect> &burningPieces,
+                                const CaptureEffect *captureCounterPopup) {
   if (boardTexture_.id != 0) {
     Rectangle src = {0.0f, 0.0f, static_cast<float>(boardTexture_.width),
                      static_cast<float>(boardTexture_.height)};
@@ -554,8 +691,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
              -static_cast<float>(boardTexture_.width),
              static_cast<float>(boardTexture_.height)};
     }
-    const Rectangle dst = getBoardRenderRect();
-    DrawTexturePro(boardTexture_, src, dst, {0.0f, 0.0f}, 0.0f,
+    DrawTexturePro(boardTexture_, src, getBoardRenderRect(), {0.0f, 0.0f}, 0.0f,
                    {255, 255, 255, 255});
   }
 
@@ -567,25 +703,6 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
   const bool hasActiveDragPreview =
       dragPreview != nullptr && dragPreview->type != PieceType::None;
 
-  auto getDisplayRow = [&](int boardRow) -> int {
-    return isBoardFlipped_ ? (ui::Board::kMaxIndex - boardRow) : boardRow;
-  };
-
-  auto getDisplayCol = [&](int boardCol) -> int {
-    return isBoardFlipped_ ? (ui::Board::kMaxIndex - boardCol) : boardCol;
-  };
-
-  auto getBoardPieceScale = [](PieceType type) -> float {
-    switch (type) {
-    case PieceType::King:
-    case PieceType::Queen:
-    case PieceType::Bishop:
-      return ui::Piece::kBoardScaleLarge;
-    default:
-      return 1.0f;
-    }
-  };
-
   auto getBurningCaptureCount = [&](Position pos) -> int {
     for (const auto &burningPiece : burningPieces) {
       if (burningPiece.pos == pos) {
@@ -596,12 +713,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
   };
 
   for (const auto &move : legalMoves) {
-    const int displayCol = getDisplayCol(move.to.col);
-    const int displayRow = getDisplayRow(move.to.row);
-    DrawRectangleRec(
-        {grid.x + static_cast<float>(displayCol) * cellW,
-         grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH},
-        ui::Highlight::kLegalMove);
+    DrawRectangleRec(getBoardSquareRect(move.to), ui::Highlight::kLegalMove);
   }
 
   if (hasActiveDragPreview) {
@@ -611,120 +723,103 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         mouseY < grid.y + grid.height) {
       const int hoverDisplayCol = static_cast<int>((mouseX - grid.x) / cellW);
       const int hoverDisplayRow = static_cast<int>((mouseY - grid.y) / cellH);
-      DrawRectangleRec(
-          {grid.x + static_cast<float>(hoverDisplayCol) * cellW,
-           grid.y + static_cast<float>(hoverDisplayRow) * cellH, cellW, cellH},
-          ui::Highlight::kDragHover);
+      DrawRectangleRec(getDisplaySquareRect(hoverDisplayRow, hoverDisplayCol),
+                       ui::Highlight::kDragHover);
     }
   }
 
   for (int row = 0; row < ui::Board::kSquaresPerSide; ++row) {
     for (int col = 0; col < ui::Board::kSquaresPerSide; ++col) {
       const Piece *piece = board.getPieceAt({row, col});
-      if (piece) {
-        if (hasActiveDragPreview && row == dragPreview->from.row &&
-            col == dragPreview->from.col) {
-          continue;
-        }
-
-        if (hasActiveCastlingTween &&
-            piece->getColor() == castlingTween->color &&
-            ((piece->getType() == PieceType::King &&
-              row == castlingTween->kingTo.row &&
-              col == castlingTween->kingTo.col) ||
-             (piece->getType() == PieceType::Rook &&
-              row == castlingTween->rookTo.row &&
-              col == castlingTween->rookTo.col))) {
-          continue;
-        }
-
-        const int displayCol = getDisplayCol(col);
-        const int displayRow = getDisplayRow(row);
-        const float boardPieceScale = getBoardPieceScale(piece->getType());
-
-        const int burningCaptureCount = getBurningCaptureCount({row, col});
-        Texture2D activeBurningTexture = burningLoopTexture_;
-        if (burningCaptureCount >= ui::BurnEffect::kSecondTierCaptureCount &&
-            burningLoop2Texture_.id != 0) {
-          activeBurningTexture = burningLoop2Texture_;
-        }
-        if (activeBurningTexture.id != 0 &&
-            burningCaptureCount >= ui::BurnEffect::kStartCaptureCount) {
-          int frameCount = ui::BurnEffect::kFrameCount;
-          if (activeBurningTexture.width < frameCount) {
-            frameCount = 1;
-          }
-          const int frameWidth = activeBurningTexture.width / frameCount;
-          const int frameHeight = activeBurningTexture.height;
-          const int frameIndex =
-              static_cast<int>(GetTime() * ui::BurnEffect::kFrameSpeed) %
-              frameCount;
-          int effectiveCaptureCount = burningCaptureCount;
-          if (effectiveCaptureCount >
-              ui::BurnEffect::kMaxEffectiveCaptureCount) {
-            effectiveCaptureCount = ui::BurnEffect::kMaxEffectiveCaptureCount;
-          }
-          const int extraCaptures =
-              effectiveCaptureCount - ui::BurnEffect::kStartCaptureCount;
-          float burnSizeFactor =
-              ui::BurnEffect::kSizeBase +
-              ui::BurnEffect::kSizeLinear * static_cast<float>(extraCaptures) +
-              ui::BurnEffect::kSizeQuadratic *
-                  static_cast<float>(extraCaptures * extraCaptures);
-          if (burnSizeFactor > ui::BurnEffect::kSizeMax) {
-            burnSizeFactor = ui::BurnEffect::kSizeMax;
-          }
-          float burnLiftFactor =
-              ui::BurnEffect::kLiftBase +
-              ui::BurnEffect::kLiftLinear * static_cast<float>(extraCaptures) +
-              ui::BurnEffect::kLiftFromSize *
-                  (burnSizeFactor - ui::BurnEffect::kLiftRefSize);
-          if (burnLiftFactor > ui::BurnEffect::kLiftMax) {
-            burnLiftFactor = ui::BurnEffect::kLiftMax;
-          }
-          const float effectSize =
-              ((cellW < cellH) ? cellW : cellH) * burnSizeFactor;
-          const Rectangle effectSrc = {
-              static_cast<float>(frameIndex * frameWidth), 0.0f,
-              static_cast<float>(frameWidth), static_cast<float>(frameHeight)};
-          const Rectangle effectDst = {
-              grid.x + static_cast<float>(displayCol) * cellW +
-                  (cellW - effectSize) * 0.5f,
-              grid.y + static_cast<float>(displayRow) * cellH +
-                  (cellH - effectSize) * 0.5f - cellH * burnLiftFactor,
-              effectSize, effectSize};
-          DrawTexturePro(activeBurningTexture, effectSrc, effectDst,
-                         {0.0f, 0.0f}, 0.0f,
-                         {255, 255, 255, ui::BurnEffect::kTintAlpha});
-        }
-
-        drawPiece(piece->getType(), piece->getColor(),
-                  grid.x + static_cast<float>(displayCol) * cellW,
-                  grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH,
-                  boardPieceScale);
+      if (piece == nullptr) {
+        continue;
       }
+
+      if (hasActiveDragPreview && row == dragPreview->from.row &&
+          col == dragPreview->from.col) {
+        continue;
+      }
+
+      if (hasActiveCastlingTween && piece->getColor() == castlingTween->color &&
+          ((piece->getType() == PieceType::King && row == castlingTween->kingTo.row &&
+            col == castlingTween->kingTo.col) ||
+           (piece->getType() == PieceType::Rook && row == castlingTween->rookTo.row &&
+            col == castlingTween->rookTo.col))) {
+        continue;
+      }
+
+      const Rectangle squareRect = getBoardSquareRect({row, col});
+      const int burningCaptureCount = getBurningCaptureCount({row, col});
+      Texture2D activeBurningTexture = burningLoopTexture_;
+      if (burningCaptureCount >= ui::BurnEffect::kSecondTierCaptureCount &&
+          burningLoop2Texture_.id != 0) {
+        activeBurningTexture = burningLoop2Texture_;
+      }
+
+      if (activeBurningTexture.id != 0 &&
+          burningCaptureCount >= ui::BurnEffect::kStartCaptureCount) {
+        int frameCount = ui::BurnEffect::kFrameCount;
+        if (activeBurningTexture.width < frameCount) {
+          frameCount = 1;
+        }
+        const int frameWidth = activeBurningTexture.width / frameCount;
+        const int frameHeight = activeBurningTexture.height;
+        const int frameIndex =
+            static_cast<int>(GetTime() * ui::BurnEffect::kFrameSpeed) % frameCount;
+
+        int effectiveCaptureCount = burningCaptureCount;
+        if (effectiveCaptureCount > ui::BurnEffect::kMaxEffectiveCaptureCount) {
+          effectiveCaptureCount = ui::BurnEffect::kMaxEffectiveCaptureCount;
+        }
+        const int extraCaptures =
+            effectiveCaptureCount - ui::BurnEffect::kStartCaptureCount;
+
+        float burnSizeFactor =
+            ui::BurnEffect::kSizeBase +
+            ui::BurnEffect::kSizeLinear * static_cast<float>(extraCaptures) +
+            ui::BurnEffect::kSizeQuadratic *
+                static_cast<float>(extraCaptures * extraCaptures);
+        if (burnSizeFactor > ui::BurnEffect::kSizeMax) {
+          burnSizeFactor = ui::BurnEffect::kSizeMax;
+        }
+
+        float burnLiftFactor =
+            ui::BurnEffect::kLiftBase +
+            ui::BurnEffect::kLiftLinear * static_cast<float>(extraCaptures) +
+            ui::BurnEffect::kLiftFromSize *
+                (burnSizeFactor - ui::BurnEffect::kLiftRefSize);
+        if (burnLiftFactor > ui::BurnEffect::kLiftMax) {
+          burnLiftFactor = ui::BurnEffect::kLiftMax;
+        }
+
+        const float effectSize = ((cellW < cellH) ? cellW : cellH) * burnSizeFactor;
+        const Rectangle effectSrc = {
+            static_cast<float>(frameIndex * frameWidth), 0.0f,
+            static_cast<float>(frameWidth), static_cast<float>(frameHeight)};
+        const Rectangle effectDst = {
+            squareRect.x + (cellW - effectSize) * 0.5f,
+            squareRect.y + (cellH - effectSize) * 0.5f - cellH * burnLiftFactor,
+            effectSize, effectSize};
+        DrawTexturePro(activeBurningTexture, effectSrc, effectDst, {0.0f, 0.0f},
+                       0.0f, {255, 255, 255, ui::BurnEffect::kTintAlpha});
+      }
+
+      drawPiece(piece->getType(), piece->getColor(), squareRect.x, squareRect.y,
+                squareRect.width, squareRect.height,
+                getBoardPieceScale(piece->getType()));
     }
   }
 
   if (captureCounterPopup != nullptr &&
       captureCounterPopup->captureCount >= ui::CapturePopup::kStartCaptureCount) {
-    float popupProgress = captureCounterPopup->progress;
-    if (popupProgress < 0.0f) {
-      popupProgress = 0.0f;
-    }
-    if (popupProgress > 1.0f) {
-      popupProgress = 1.0f;
-    }
-
-    const int popupDisplayCol = getDisplayCol(captureCounterPopup->pos.col);
-    const int popupDisplayRow = getDisplayRow(captureCounterPopup->pos.row);
-    const float squareX = grid.x + static_cast<float>(popupDisplayCol) * cellW;
-    const float squareY = grid.y + static_cast<float>(popupDisplayRow) * cellH;
+    const float popupProgress = clamp01(captureCounterPopup->progress);
+    const Rectangle squareRect = getBoardSquareRect(captureCounterPopup->pos);
 
     int effectiveCaptureCount = captureCounterPopup->captureCount;
     if (effectiveCaptureCount > ui::CapturePopup::kMaxEffectiveCaptureCount) {
       effectiveCaptureCount = ui::CapturePopup::kMaxEffectiveCaptureCount;
     }
+
     const float intensity =
         1.0f +
         ui::CapturePopup::kIntensityPerCapture *
@@ -742,13 +837,12 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         cellH * (ui::CapturePopup::kFloatBase +
                  ui::CapturePopup::kFloatPerIntensity * intensity) *
         moveEase;
-    const unsigned char textAlpha =
-        static_cast<unsigned char>(255.0f * fadeEase);
+
+    const unsigned char textAlpha = static_cast<unsigned char>(255.0f * fadeEase);
     const unsigned char boxAlpha =
-        static_cast<unsigned char>(
-            (ui::CapturePopup::kBoxAlphaBase +
-             ui::CapturePopup::kBoxAlphaPerIntensity * intensity) *
-            fadeEase);
+        static_cast<unsigned char>((ui::CapturePopup::kBoxAlphaBase +
+                                    ui::CapturePopup::kBoxAlphaPerIntensity * intensity) *
+                                   fadeEase);
     const float textAlphaNorm = static_cast<float>(textAlpha) / 255.0f;
 
     float shakeOffsetX = 0.0f;
@@ -767,8 +861,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
           shakeStrength * ui::CapturePopup::kShakeYStrengthMultiplier;
     }
 
-    const char *popupText =
-        TextFormat("x%d", captureCounterPopup->captureCount);
+    const char *popupText = TextFormat("x%d", captureCounterPopup->captureCount);
     int popupFontSize =
         static_cast<int>(cellH *
                          (ui::CapturePopup::kFontBase +
@@ -777,15 +870,16 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     if (popupFontSize < ui::CapturePopup::kMinFont) {
       popupFontSize = ui::CapturePopup::kMinFont;
     }
+
     const int popupTextWidth = MeasureText(popupText, popupFontSize);
     const float padX = cellW * ui::CapturePopup::kPadX;
     const float padY = cellH * ui::CapturePopup::kPadY;
     const float badgeW = static_cast<float>(popupTextWidth) + padX * 2.0f;
     const float badgeH = static_cast<float>(popupFontSize) + padY * 2.0f;
     const Rectangle popupBadge = {
-        squareX + cellW - badgeW - cellW * ui::CapturePopup::kBadgeRightInset +
+        squareRect.x + cellW - badgeW - cellW * ui::CapturePopup::kBadgeRightInset +
             shakeOffsetX,
-        squareY + cellH * ui::CapturePopup::kBadgeTopInset - floatUp +
+        squareRect.y + cellH * ui::CapturePopup::kBadgeTopInset - floatUp +
             shakeOffsetY,
         badgeW, badgeH};
 
@@ -794,84 +888,50 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         ui::CapturePopup::kBadgeSegments,
         {ui::CapturePopup::kBadgeBackground.r, ui::CapturePopup::kBadgeBackground.g,
          ui::CapturePopup::kBadgeBackground.b, boxAlpha});
+
     const auto popupBorderColor =
         isOverheatTier
             ? Fade(GetColor(ui::CapturePopup::kOverheatBorderColor), textAlphaNorm)
             : Fade(GetColor(ui::CapturePopup::kBorderColor), textAlphaNorm);
-    const auto popupTextColor = isOverheatTier
-                                    ? Fade(GetColor(ui::CapturePopup::kOverheatTextColor),
-                                           textAlphaNorm)
-                                    : Fade(GetColor(ui::CapturePopup::kTextColor),
-                                           textAlphaNorm);
+    const auto popupTextColor =
+        isOverheatTier
+            ? Fade(GetColor(ui::CapturePopup::kOverheatTextColor), textAlphaNorm)
+            : Fade(GetColor(ui::CapturePopup::kTextColor), textAlphaNorm);
+
     DrawRectangleRoundedLinesEx(popupBadge, ui::CapturePopup::kBadgeRoundness,
                                 ui::CapturePopup::kBadgeSegments,
                                 ui::CapturePopup::kBadgeBorderWidth,
                                 popupBorderColor);
     DrawText(popupText, static_cast<int>(popupBadge.x + padX),
-             static_cast<int>(popupBadge.y + padY), popupFontSize,
-             popupTextColor);
+             static_cast<int>(popupBadge.y + padY), popupFontSize, popupTextColor);
   }
 
   if (hasActiveCastlingTween) {
-    float progress = castlingTween->progress;
-    if (progress < 0.0f) {
-      progress = 0.0f;
-    }
-    if (progress > 1.0f) {
-      progress = 1.0f;
-    }
+    const float progress = clamp01(castlingTween->progress);
+    const Rectangle kingFromRect = getBoardSquareRect(castlingTween->kingFrom);
+    const Rectangle kingToRect = getBoardSquareRect(castlingTween->kingTo);
+    const Rectangle rookFromRect = getBoardSquareRect(castlingTween->rookFrom);
+    const Rectangle rookToRect = getBoardSquareRect(castlingTween->rookTo);
 
-    const float kingStartX =
-        grid.x +
-        static_cast<float>(getDisplayCol(castlingTween->kingFrom.col)) * cellW;
-    const float kingStartY =
-        grid.y +
-        static_cast<float>(getDisplayRow(castlingTween->kingFrom.row)) * cellH;
-    const float kingEndX =
-        grid.x +
-        static_cast<float>(getDisplayCol(castlingTween->kingTo.col)) * cellW;
-    const float kingEndY =
-        grid.y +
-        static_cast<float>(getDisplayRow(castlingTween->kingTo.row)) * cellH;
-    const float kingX = kingStartX + (kingEndX - kingStartX) * progress;
-    const float kingY = kingStartY + (kingEndY - kingStartY) * progress;
+    const float kingX = kingFromRect.x + (kingToRect.x - kingFromRect.x) * progress;
+    const float kingY = kingFromRect.y + (kingToRect.y - kingFromRect.y) * progress;
     drawPiece(PieceType::King, castlingTween->color, kingX, kingY, cellW, cellH,
               getBoardPieceScale(PieceType::King));
 
-    const float rookStartX =
-        grid.x +
-        static_cast<float>(getDisplayCol(castlingTween->rookFrom.col)) * cellW;
-    const float rookStartY =
-        grid.y +
-        static_cast<float>(getDisplayRow(castlingTween->rookFrom.row)) * cellH;
-    const float rookEndX =
-        grid.x +
-        static_cast<float>(getDisplayCol(castlingTween->rookTo.col)) * cellW;
-    const float rookEndY =
-        grid.y +
-        static_cast<float>(getDisplayRow(castlingTween->rookTo.row)) * cellH;
-    const float rookX = rookStartX + (rookEndX - rookStartX) * progress;
-    const float rookY = rookStartY + (rookEndY - rookStartY) * progress;
+    const float rookX = rookFromRect.x + (rookToRect.x - rookFromRect.x) * progress;
+    const float rookY = rookFromRect.y + (rookToRect.y - rookFromRect.y) * progress;
     drawPiece(PieceType::Rook, castlingTween->color, rookX, rookY, cellW, cellH,
               getBoardPieceScale(PieceType::Rook));
   }
 
   if (selectedSquare != nullptr) {
-    const int displayCol = getDisplayCol(selectedSquare->col);
-    const int displayRow = getDisplayRow(selectedSquare->row);
-    DrawRectangleLinesEx({grid.x + static_cast<float>(displayCol) * cellW,
-                          grid.y + static_cast<float>(displayRow) * cellH,
-                          cellW, cellH},
+    DrawRectangleLinesEx(getBoardSquareRect(*selectedSquare),
                          ui::Highlight::kSelectionLine,
                          ui::Highlight::kSelection);
   }
 
   if (invalidHighlightSquare != nullptr) {
-    const int displayCol = getDisplayCol(invalidHighlightSquare->col);
-    const int displayRow = getDisplayRow(invalidHighlightSquare->row);
-    const Rectangle invalidRect = {
-        grid.x + static_cast<float>(displayCol) * cellW,
-        grid.y + static_cast<float>(displayRow) * cellH, cellW, cellH};
+    const Rectangle invalidRect = getBoardSquareRect(*invalidHighlightSquare);
     DrawRectangleRec(invalidRect, ui::Highlight::kInvalidFill);
     DrawRectangleLinesEx(invalidRect, ui::Highlight::kInvalidLine,
                          ui::Highlight::kInvalidBorder);
@@ -883,33 +943,82 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     drawPiece(dragPreview->type, dragPreview->color, dragX, dragY, cellW, cellH,
               getBoardPieceScale(dragPreview->type));
   }
+}
 
-  auto getInitialCount = [](PieceType type) -> int {
-    switch (type) {
-    case PieceType::Pawn:
-      return ui::Board::kSquaresPerSide;
-    case PieceType::Knight:
-    case PieceType::Bishop:
-    case PieceType::Rook:
-      return 2;
-    case PieceType::Queen:
-    case PieceType::King:
-      return 1;
-    default:
-      return 0;
+int ChessView::drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
+                                   const char *title, ChessColor capturedColor,
+                                   const std::map<PieceType, int> &captured) {
+  const float uiScale = getUiScale();
+  const CapturedSectionLayout layout =
+      computeCapturedSectionLayout(sectionWidth, captured, uiScale,
+                                   getBoardRenderRect().width, GetScreenWidth());
+
+  float capturedScale = getBoardRenderRect().width / ui::Board::kUiBaseWidth;
+  if (capturedScale < ui::RightPanel::kCapturedScaleMin) {
+    capturedScale = ui::RightPanel::kCapturedScaleMin;
+  }
+  if (capturedScale > ui::RightPanel::kCapturedScaleMax) {
+    capturedScale = ui::RightPanel::kCapturedScaleMax;
+  }
+
+  const int titleFontSize = static_cast<int>(ui::RightPanel::kTitleFont * capturedScale);
+  DrawText(title, sectionX + static_cast<int>(ui::RightPanel::kTitlePadX * uiScale),
+           sectionY + static_cast<int>(ui::RightPanel::kTitlePadY * uiScale),
+           titleFontSize, ui::Dialog::kTextPrimary);
+
+  if (layout.totalCaptured == 0) {
+    DrawText("-", sectionX + static_cast<int>(ui::RightPanel::kEmptyX * uiScale),
+             sectionY + static_cast<int>(ui::RightPanel::kCapturedY * uiScale),
+             static_cast<int>(ui::RightPanel::kEmptyFont * capturedScale),
+             {180, 180, 180, 255});
+    return layout.contentHeight;
+  }
+
+  float iconX = static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
+  float iconY = static_cast<float>(sectionY) + ui::RightPanel::kCapturedY * uiScale;
+  int drawn = 0;
+  const PieceType *pieceOrder = capturedPieceOrder();
+  for (int pieceIndex = 0; pieceIndex < kCapturedPieceOrderCount; ++pieceIndex) {
+    const PieceType type = pieceOrder[pieceIndex];
+    const int count = captured.at(type);
+    for (int index = 0; index < count; ++index) {
+      const float pieceFactor = getCapturedPieceSizeFactor(type);
+      const float drawW = layout.iconW * pieceFactor;
+      const float drawH = layout.iconH * pieceFactor;
+      const float drawX = iconX + (layout.iconW - drawW) * 0.5f;
+      const float drawY = iconY + (layout.iconH - drawH) * 0.5f;
+      drawPiece(type, capturedColor, drawX, drawY, drawW, drawH);
+
+      drawn += 1;
+      if (drawn % layout.safeMaxPerRow == 0) {
+        iconX = static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
+        iconY += layout.iconH + layout.gap;
+      } else {
+        iconX += layout.iconW + layout.gap;
+      }
     }
-  };
+  }
 
+  return layout.contentHeight;
+}
+
+int ChessView::getCapturedSectionHeight(
+    int sectionWidth, const std::map<PieceType, int> &captured) const {
+  return computeCapturedSectionLayout(sectionWidth, captured, getUiScale(),
+                                      getBoardRenderRect().width,
+                                      GetScreenWidth())
+      .contentHeight;
+}
+
+void ChessView::drawRightPanel(const Board &board) {
   std::map<PieceType, int> whiteRemaining;
   std::map<PieceType, int> blackRemaining;
-
   for (int row = 0; row < ui::Board::kSquaresPerSide; ++row) {
     for (int col = 0; col < ui::Board::kSquaresPerSide; ++col) {
       const Piece *piece = board.getPieceAt({row, col});
       if (piece == nullptr) {
         continue;
       }
-
       const PieceType type = piece->getType();
       if (piece->getColor() == ChessColor::White) {
         whiteRemaining[type] += 1;
@@ -921,11 +1030,9 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
 
   std::map<PieceType, int> capturedBlackPieces;
   std::map<PieceType, int> capturedWhitePieces;
-  const std::vector<PieceType> pieceOrder = {
-      PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight,
-      PieceType::Pawn};
-
-  for (const PieceType type : pieceOrder) {
+  const PieceType *pieceOrder = capturedPieceOrder();
+  for (int pieceIndex = 0; pieceIndex < kCapturedPieceOrderCount; ++pieceIndex) {
+    const PieceType type = pieceOrder[pieceIndex];
     int blackCaptured = getInitialCount(type) - blackRemaining[type];
     if (blackCaptured < 0) {
       blackCaptured = 0;
@@ -938,322 +1045,184 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     capturedWhitePieces[type] = whiteCaptured;
   }
 
-  auto drawCapturedSection =
-      [&](int sectionX, int sectionY, int sectionWidth, const char *title,
-          ChessColor capturedColor,
-          const std::map<PieceType, int> &captured) -> int {
-    const float uiScale = getUiScale();
-    float capturedScale = getBoardRenderRect().width / ui::Board::kUiBaseWidth;
-    if (capturedScale < ui::RightPanel::kCapturedScaleMin) {
-      capturedScale = ui::RightPanel::kCapturedScaleMin;
-    }
-    if (capturedScale > ui::RightPanel::kCapturedScaleMax) {
-      capturedScale = ui::RightPanel::kCapturedScaleMax;
-    }
-    const int titleFontSize =
-        static_cast<int>(ui::RightPanel::kTitleFont * capturedScale);
-    DrawText(title,
-             sectionX + static_cast<int>(ui::RightPanel::kTitlePadX * uiScale),
-             sectionY + static_cast<int>(ui::RightPanel::kTitlePadY * uiScale),
-             titleFontSize, ui::Dialog::kTextPrimary);
-
-    const bool compactColumns =
-        GetScreenWidth() <= ui::RightPanel::kCompactColumnsMaxScreenWidth;
-    const float iconW =
-        (compactColumns ? ui::RightPanel::kIconSizeCompact
-                        : ui::RightPanel::kIconSizeRegular) *
-        capturedScale;
-    const float iconH =
-        (compactColumns ? ui::RightPanel::kIconSizeCompact
-                        : ui::RightPanel::kIconSizeRegular) *
-        capturedScale;
-    const float gap =
-        (compactColumns ? ui::RightPanel::kIconGapCompact
-                        : ui::RightPanel::kIconGapRegular) *
-        capturedScale;
-    const int maxPerRow =
-                          (sectionWidth -
-                           static_cast<int>(ui::RightPanel::kGridInsetWidth *
-                                            uiScale)) /
-                          static_cast<int>(iconW + gap);
-    const int safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
-    float iconX =
-        static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
-    float iconY =
-        static_cast<float>(sectionY) + ui::RightPanel::kCapturedY * uiScale;
-    int drawn = 0;
-
-    auto getCapturedPieceSizeFactor = [](PieceType type) -> float {
-      switch (type) {
-      case PieceType::King:
-      case PieceType::Queen:
-      case PieceType::Bishop:
-        return ui::Piece::kCapturedScaleLarge;
-      default:
-        return 1.0f;
-      }
-    };
-
-    for (const PieceType type : pieceOrder) {
-      const int count = captured.at(type);
-      for (int index = 0; index < count; ++index) {
-        const float pieceFactor = getCapturedPieceSizeFactor(type);
-        const float drawW = iconW * pieceFactor;
-        const float drawH = iconH * pieceFactor;
-        const float drawX = iconX + (iconW - drawW) * 0.5f;
-        const float drawY = iconY + (iconH - drawH) * 0.5f;
-        drawPiece(type, capturedColor, drawX, drawY, drawW, drawH);
-        drawn += 1;
-        if (drawn % safeMaxPerRow == 0) {
-          iconX =
-              static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
-          iconY += iconH + gap;
-        } else {
-          iconX += iconW + gap;
-        }
-      }
-    }
-
-    if (drawn == 0) {
-      DrawText("-", sectionX + static_cast<int>(ui::RightPanel::kEmptyX * uiScale),
-               sectionY + static_cast<int>(ui::RightPanel::kCapturedY * uiScale),
-               static_cast<int>(ui::RightPanel::kEmptyFont * capturedScale),
-               {180, 180, 180, 255});
-      return static_cast<int>(ui::RightPanel::kEmptyHeight * uiScale);
-    }
-
-    const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
-    return static_cast<int>(ui::RightPanel::kSectionTopPadding * uiScale) +
-           rows * static_cast<int>(iconH + gap);
-  };
-
-  auto getCapturedSectionHeight =
-      [&](int sectionWidth, const std::map<PieceType, int> &captured) -> int {
-    const float uiScale = getUiScale();
-    float capturedScale = getBoardRenderRect().width / ui::Board::kUiBaseWidth;
-    if (capturedScale < ui::RightPanel::kCapturedScaleMin) {
-      capturedScale = ui::RightPanel::kCapturedScaleMin;
-    }
-    if (capturedScale > ui::RightPanel::kCapturedScaleMax) {
-      capturedScale = ui::RightPanel::kCapturedScaleMax;
-    }
-    const bool compactColumns =
-        GetScreenWidth() <= ui::RightPanel::kCompactColumnsMaxScreenWidth;
-    const float iconW =
-        (compactColumns ? ui::RightPanel::kIconSizeCompact
-                        : ui::RightPanel::kIconSizeRegular) *
-        capturedScale;
-    const float iconH =
-        (compactColumns ? ui::RightPanel::kIconSizeCompact
-                        : ui::RightPanel::kIconSizeRegular) *
-        capturedScale;
-    const float gap =
-        (compactColumns ? ui::RightPanel::kIconGapCompact
-                        : ui::RightPanel::kIconGapRegular) *
-        capturedScale;
-    const int maxPerRow =
-                          (sectionWidth -
-                           static_cast<int>(ui::RightPanel::kGridInsetWidth *
-                                            uiScale)) /
-                          static_cast<int>(iconW + gap);
-    const int safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
-
-    int drawn = 0;
-    for (const PieceType type : pieceOrder) {
-      drawn += captured.at(type);
-    }
-
-    if (drawn == 0) {
-      return static_cast<int>(ui::RightPanel::kEmptyHeight * uiScale);
-    }
-
-    const int rows = (drawn + safeMaxPerRow - 1) / safeMaxPerRow;
-    return static_cast<int>(ui::RightPanel::kSectionTopPadding * uiScale) +
-           rows * static_cast<int>(iconH + gap);
-  };
-
   const Rectangle rightPanel = getRightPanelRect();
   const int rightPanelX = static_cast<int>(rightPanel.x);
   const int rightPanelWidth = static_cast<int>(rightPanel.width);
   const int rightPanelHeight = static_cast<int>(rightPanel.height);
-
-  if (rightPanelWidth > 0) {
-    DrawRectangle(rightPanelX, 0, rightPanelWidth, rightPanelHeight,
-                  ui::RightPanel::kBackground);
-    DrawLine(rightPanelX, 0, rightPanelX, rightPanelHeight,
-             ui::RightPanel::kDivider);
-
-    const Vector2 mousePos = GetMousePosition();
-    const Rectangle settingsButton = getSettingsButtonRect();
-    const Rectangle rotateButton = getRotateButtonRect();
-    const Rectangle restartButton = getRestartButtonRect();
-    const bool settingsHovered =
-        CheckCollisionPointRec(mousePos, settingsButton);
-    const bool rotateHovered = CheckCollisionPointRec(mousePos, rotateButton);
-    const bool restartHovered = CheckCollisionPointRec(mousePos, restartButton);
-
-    auto drawRoundedIconButton = [&](Rectangle buttonRect, bool hovered) {
-      const float uiScale = getUiScale();
-      if (hovered) {
-        const float boost = ui::IconButtons::kHoverBoost * uiScale;
-        buttonRect.x -= boost;
-        buttonRect.y -= boost;
-        buttonRect.width += boost * 2.0f;
-        buttonRect.height += boost * 2.0f;
-      }
-
-      DrawRectangleRounded(
-          buttonRect, ui::IconButtons::kRoundness, ui::IconButtons::kSegments,
-          hovered ? ui::IconButtons::kButtonFillHover
-                  : ui::IconButtons::kButtonFill);
-      DrawRectangleRoundedLinesEx(
-          buttonRect, ui::IconButtons::kRoundness, ui::IconButtons::kSegments,
-          ui::IconButtons::kBorderWidth,
-          hovered ? ui::IconButtons::kButtonBorderHover
-                  : ui::IconButtons::kButtonBorder);
-    };
-
-    drawRoundedIconButton(settingsButton, settingsHovered);
-    drawRoundedIconButton(rotateButton, rotateHovered);
-    drawRoundedIconButton(restartButton, restartHovered);
-    const float uiScale = getUiScale();
-    const float buttonIconSize = ui::IconButtons::kIconSize * uiScale;
-
-    if (settingIconTexture_.id != 0) {
-      const Rectangle iconSrc = {
-          0.0f, 0.0f, static_cast<float>(settingIconTexture_.width),
-          static_cast<float>(settingIconTexture_.height)};
-      const Rectangle iconDst = {
-          settingsButton.x + (settingsButton.width - buttonIconSize) * 0.5f,
-          settingsButton.y + (settingsButton.height - buttonIconSize) * 0.5f,
-          buttonIconSize, buttonIconSize};
-      DrawTexturePro(settingIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                     {255, 255, 255, 255});
-    } else {
-      DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
-                   settingsButton.y + settingsButton.height * 0.5f},
-                  ui::IconButtons::kFallbackSettingsOuterRadius * uiScale,
-                  {235, 235, 235, 255});
-      DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
-                   settingsButton.y + settingsButton.height * 0.5f},
-                  ui::IconButtons::kFallbackSettingsInnerRadius * uiScale,
-                  {48, 58, 78, 255});
-    }
-
-    if (rotateIconTexture_.id != 0) {
-      const Rectangle iconSrc = {0.0f, 0.0f,
-                                 static_cast<float>(rotateIconTexture_.width),
-                                 static_cast<float>(rotateIconTexture_.height)};
-      const Rectangle iconDst = {
-          rotateButton.x + (rotateButton.width - buttonIconSize) * 0.5f,
-          rotateButton.y + (rotateButton.height - buttonIconSize) * 0.5f,
-          buttonIconSize, buttonIconSize};
-      DrawTexturePro(rotateIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                     {255, 255, 255, 255});
-    } else {
-      DrawText("R",
-               static_cast<int>(rotateButton.x +
-                                ui::IconButtons::kFallbackRotateLabelX * uiScale),
-               static_cast<int>(rotateButton.y +
-                                ui::IconButtons::kFallbackRotateLabelY * uiScale),
-               static_cast<int>(ui::IconButtons::kIconSize * uiScale),
-               ui::Dialog::kTextPrimary);
-    }
-
-    if (restartIconTexture_.id != 0) {
-      const Rectangle iconSrc = {
-          0.0f, 0.0f, static_cast<float>(restartIconTexture_.width),
-          static_cast<float>(restartIconTexture_.height)};
-      const Rectangle iconDst = {
-          restartButton.x + (restartButton.width - buttonIconSize) * 0.5f,
-          restartButton.y + (restartButton.height - buttonIconSize) * 0.5f,
-          buttonIconSize, buttonIconSize};
-      DrawTexturePro(restartIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                     {255, 255, 255, 255});
-    } else {
-      const float cx = restartButton.x + restartButton.width * 0.5f;
-      const float cy = restartButton.y + restartButton.height * 0.5f;
-      DrawRing({cx, cy}, ui::IconButtons::kRestartRingInner * uiScale,
-               ui::IconButtons::kRestartRingOuter * uiScale,
-               ui::IconButtons::kRestartRingStartDeg,
-               ui::IconButtons::kRestartRingEndDeg,
-               ui::IconButtons::kRestartRingSegments,
-               {235, 235, 235, 255});
-      DrawTriangle({cx + ui::IconButtons::kRestartArrowA_X * uiScale,
-                    cy + ui::IconButtons::kRestartArrowA_Y * uiScale},
-                   {cx + ui::IconButtons::kRestartArrowB_X * uiScale,
-                    cy + ui::IconButtons::kRestartArrowB_Y * uiScale},
-                   {cx + ui::IconButtons::kRestartArrowC_X * uiScale,
-                    cy + ui::IconButtons::kRestartArrowC_Y * uiScale},
-                   ui::Dialog::kTextPrimary);
-    }
-
-    auto drawCenteredHoverText = [&](Rectangle buttonRect, const char *text) {
-      const int kTooltipFontSize =
-          static_cast<int>(ui::IconButtons::kTooltipFont * getUiScale());
-      const int textWidth = MeasureText(text, kTooltipFontSize);
-      const float buttonCenterX = buttonRect.x + buttonRect.width * 0.5f;
-      const int textX = static_cast<int>(buttonCenterX - textWidth * 0.5f);
-      const int textY = static_cast<int>(buttonRect.y -
-                                         ui::IconButtons::kTooltipYOffset *
-                                             getUiScale());
-      DrawText(text, textX, textY, kTooltipFontSize, ui::IconButtons::kTooltipText);
-    };
-
-    if (rotateHovered) {
-      drawCenteredHoverText(rotateButton, "Rotate board");
-    }
-    if (restartHovered) {
-      drawCenteredHoverText(restartButton, "Restart game");
-    }
-    if (settingsHovered) {
-      drawCenteredHoverText(settingsButton, "Window size");
-    }
-
-    const bool swapCapturedSections = isBoardFlipped_;
-    const char *topTitle =
-        swapCapturedSections ? "Black captured" : "White captured";
-    const ChessColor topPieceColor =
-        swapCapturedSections ? ChessColor::White : ChessColor::Black;
-    const std::map<PieceType, int> &topCaptured =
-        swapCapturedSections ? capturedWhitePieces : capturedBlackPieces;
-
-    const char *bottomTitle =
-        swapCapturedSections ? "White captured" : "Black captured";
-    const ChessColor bottomPieceColor =
-        swapCapturedSections ? ChessColor::Black : ChessColor::White;
-    const std::map<PieceType, int> &bottomCaptured =
-        swapCapturedSections ? capturedBlackPieces : capturedWhitePieces;
-
-    const int topSectionY = static_cast<int>(ui::RightPanel::kTopSectionY);
-    const int topSectionBottom =
-        topSectionY + drawCapturedSection(rightPanelX, topSectionY,
-                                          rightPanelWidth, topTitle,
-                                          topPieceColor, topCaptured);
-
-    const int bottomSectionHeight =
-        getCapturedSectionHeight(rightPanelWidth, bottomCaptured);
-    int bottomSectionY =
-        rightPanelHeight - static_cast<int>(ui::RightPanel::kBottomSectionMargin) -
-        bottomSectionHeight;
-    if (bottomSectionY <
-        topSectionBottom + static_cast<int>(ui::RightPanel::kTopBottomGap)) {
-      bottomSectionY =
-          topSectionBottom + static_cast<int>(ui::RightPanel::kTopBottomGap);
-    }
-
-    drawCapturedSection(rightPanelX, bottomSectionY, rightPanelWidth,
-                        bottomTitle, bottomPieceColor, bottomCaptured);
+  if (rightPanelWidth <= 0) {
+    return;
   }
 
+  DrawRectangle(rightPanelX, 0, rightPanelWidth, rightPanelHeight,
+                ui::RightPanel::kBackground);
+  DrawLine(rightPanelX, 0, rightPanelX, rightPanelHeight, ui::RightPanel::kDivider);
+
+  const Vector2 mousePos = GetMousePosition();
+  const Rectangle settingsButton = getSettingsButtonRect();
+  const Rectangle rotateButton = getRotateButtonRect();
+  const Rectangle restartButton = getRestartButtonRect();
+  const bool settingsHovered = CheckCollisionPointRec(mousePos, settingsButton);
+  const bool rotateHovered = CheckCollisionPointRec(mousePos, rotateButton);
+  const bool restartHovered = CheckCollisionPointRec(mousePos, restartButton);
+
+  const float uiScale = getUiScale();
+  const auto drawRoundedIconButton = [uiScale](Rectangle buttonRect, bool hovered) {
+    if (hovered) {
+      const float boost = ui::IconButtons::kHoverBoost * uiScale;
+      buttonRect.x -= boost;
+      buttonRect.y -= boost;
+      buttonRect.width += boost * 2.0f;
+      buttonRect.height += boost * 2.0f;
+    }
+
+    DrawRectangleRounded(buttonRect, ui::IconButtons::kRoundness,
+                        ui::IconButtons::kSegments,
+                        hovered ? ui::IconButtons::kButtonFillHover
+                                : ui::IconButtons::kButtonFill);
+    DrawRectangleRoundedLinesEx(buttonRect, ui::IconButtons::kRoundness,
+                                ui::IconButtons::kSegments,
+                                ui::IconButtons::kBorderWidth,
+                                hovered ? ui::IconButtons::kButtonBorderHover
+                                        : ui::IconButtons::kButtonBorder);
+  };
+
+  drawRoundedIconButton(settingsButton, settingsHovered);
+  drawRoundedIconButton(rotateButton, rotateHovered);
+  drawRoundedIconButton(restartButton, restartHovered);
+
+  const float buttonIconSize = ui::IconButtons::kIconSize * uiScale;
+
+  if (settingIconTexture_.id != 0) {
+    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(settingIconTexture_.width),
+                               static_cast<float>(settingIconTexture_.height)};
+    const Rectangle iconDst = {
+        settingsButton.x + (settingsButton.width - buttonIconSize) * 0.5f,
+        settingsButton.y + (settingsButton.height - buttonIconSize) * 0.5f,
+        buttonIconSize, buttonIconSize};
+    DrawTexturePro(settingIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
+                   {255, 255, 255, 255});
+  } else {
+    DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
+                 settingsButton.y + settingsButton.height * 0.5f},
+                ui::IconButtons::kFallbackSettingsOuterRadius * uiScale,
+                {235, 235, 235, 255});
+    DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
+                 settingsButton.y + settingsButton.height * 0.5f},
+                ui::IconButtons::kFallbackSettingsInnerRadius * uiScale,
+                {48, 58, 78, 255});
+  }
+
+  if (rotateIconTexture_.id != 0) {
+    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(rotateIconTexture_.width),
+                               static_cast<float>(rotateIconTexture_.height)};
+    const Rectangle iconDst = {
+        rotateButton.x + (rotateButton.width - buttonIconSize) * 0.5f,
+        rotateButton.y + (rotateButton.height - buttonIconSize) * 0.5f,
+        buttonIconSize, buttonIconSize};
+    DrawTexturePro(rotateIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
+                   {255, 255, 255, 255});
+  } else {
+    DrawText("R",
+             static_cast<int>(rotateButton.x +
+                              ui::IconButtons::kFallbackRotateLabelX * uiScale),
+             static_cast<int>(rotateButton.y +
+                              ui::IconButtons::kFallbackRotateLabelY * uiScale),
+             static_cast<int>(ui::IconButtons::kIconSize * uiScale),
+             ui::Dialog::kTextPrimary);
+  }
+
+  if (restartIconTexture_.id != 0) {
+    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(restartIconTexture_.width),
+                               static_cast<float>(restartIconTexture_.height)};
+    const Rectangle iconDst = {
+        restartButton.x + (restartButton.width - buttonIconSize) * 0.5f,
+        restartButton.y + (restartButton.height - buttonIconSize) * 0.5f,
+        buttonIconSize, buttonIconSize};
+    DrawTexturePro(restartIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
+                   {255, 255, 255, 255});
+  } else {
+    const float cx = restartButton.x + restartButton.width * 0.5f;
+    const float cy = restartButton.y + restartButton.height * 0.5f;
+    DrawRing({cx, cy}, ui::IconButtons::kRestartRingInner * uiScale,
+             ui::IconButtons::kRestartRingOuter * uiScale,
+             ui::IconButtons::kRestartRingStartDeg,
+             ui::IconButtons::kRestartRingEndDeg,
+             ui::IconButtons::kRestartRingSegments, {235, 235, 235, 255});
+    DrawTriangle({cx + ui::IconButtons::kRestartArrowA_X * uiScale,
+                  cy + ui::IconButtons::kRestartArrowA_Y * uiScale},
+                 {cx + ui::IconButtons::kRestartArrowB_X * uiScale,
+                  cy + ui::IconButtons::kRestartArrowB_Y * uiScale},
+                 {cx + ui::IconButtons::kRestartArrowC_X * uiScale,
+                  cy + ui::IconButtons::kRestartArrowC_Y * uiScale},
+                 ui::Dialog::kTextPrimary);
+  }
+
+  const auto drawCenteredHoverText = [this](Rectangle buttonRect, const char *text) {
+    const int tooltipFontSize =
+        static_cast<int>(ui::IconButtons::kTooltipFont * getUiScale());
+    const int textWidth = MeasureText(text, tooltipFontSize);
+    const float buttonCenterX = buttonRect.x + buttonRect.width * 0.5f;
+    const int textX = static_cast<int>(buttonCenterX - textWidth * 0.5f);
+    const int textY = static_cast<int>(buttonRect.y -
+                                       ui::IconButtons::kTooltipYOffset * getUiScale());
+    DrawText(text, textX, textY, tooltipFontSize, ui::IconButtons::kTooltipText);
+  };
+
+  if (rotateHovered) {
+    drawCenteredHoverText(rotateButton, "Rotate board");
+  }
+  if (restartHovered) {
+    drawCenteredHoverText(restartButton, "Restart game");
+  }
+  if (settingsHovered) {
+    drawCenteredHoverText(settingsButton, "Window size");
+  }
+
+  const bool swapCapturedSections = isBoardFlipped_;
+  const char *topTitle = swapCapturedSections ? "Black captured" : "White captured";
+  const ChessColor topPieceColor =
+      swapCapturedSections ? ChessColor::White : ChessColor::Black;
+  const std::map<PieceType, int> &topCaptured =
+      swapCapturedSections ? capturedWhitePieces : capturedBlackPieces;
+
+  const char *bottomTitle =
+      swapCapturedSections ? "White captured" : "Black captured";
+  const ChessColor bottomPieceColor =
+      swapCapturedSections ? ChessColor::Black : ChessColor::White;
+  const std::map<PieceType, int> &bottomCaptured =
+      swapCapturedSections ? capturedBlackPieces : capturedWhitePieces;
+
+  const int topSectionY = static_cast<int>(ui::RightPanel::kTopSectionY);
+  const int topSectionBottom =
+      topSectionY + drawCapturedSection(rightPanelX, topSectionY, rightPanelWidth,
+                                        topTitle, topPieceColor, topCaptured);
+
+  const int bottomSectionHeight =
+      getCapturedSectionHeight(rightPanelWidth, bottomCaptured);
+  int bottomSectionY =
+      rightPanelHeight - static_cast<int>(ui::RightPanel::kBottomSectionMargin) -
+      bottomSectionHeight;
+  if (bottomSectionY <
+      topSectionBottom + static_cast<int>(ui::RightPanel::kTopBottomGap)) {
+    bottomSectionY =
+        topSectionBottom + static_cast<int>(ui::RightPanel::kTopBottomGap);
+  }
+
+  drawCapturedSection(rightPanelX, bottomSectionY, rightPanelWidth, bottomTitle,
+                      bottomPieceColor, bottomCaptured);
+}
+
+void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
+                                       bool showWindowSizeDialog,
+                                       GameState gameState,
+                                       const ChessColor *winnerColor,
+                                       const ChessColor *promotionColor) {
   if (gameState == GameState::Checkmate || gameState == GameState::Stalemate) {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
-                  ui::Overlay::kGameOver);
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Overlay::kGameOver);
 
     const ui::AutoLayout::Metrics m =
         ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
     const Rectangle dialog = ui::AutoLayout::GameOverDialogRect(m);
-
     const float heightScale = dialog.height / ui::GameOverDialog::kHeight;
 
     const int titleFontSize =
@@ -1319,8 +1288,7 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     const float uiScale = getUiScale();
     const int titleFontSize =
         static_cast<int>(ui::Dialog::kRestartTitleFont * uiScale);
-    const int bodyFontSize =
-        static_cast<int>(ui::Dialog::kRestartBodyFont * uiScale);
+    const int bodyFontSize = static_cast<int>(ui::Dialog::kRestartBodyFont * uiScale);
     const int actionFontSize =
         static_cast<int>(ui::Dialog::kRestartActionFont * uiScale);
     const char *titleText = "Restart game?";
@@ -1362,15 +1330,14 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                                 ui::ActionButton::kBorderWidth,
                                 yesHovered ? ui::ActionButton::kPositiveBorderHover
                                            : ui::ActionButton::kPositiveBorder);
-    DrawText(
-        yesText,
-        static_cast<int>(yesButton.x +
-                         (yesButton.width - static_cast<float>(yesTextWidth)) *
-                             0.5f),
-        static_cast<int>(
-            yesButton.y +
-            (yesButton.height - static_cast<float>(actionFontSize)) * 0.5f),
-        actionFontSize, ui::ActionButton::kYesText);
+    DrawText(yesText,
+             static_cast<int>(yesButton.x +
+                              (yesButton.width - static_cast<float>(yesTextWidth)) *
+                                  0.5f),
+             static_cast<int>(yesButton.y +
+                              (yesButton.height - static_cast<float>(actionFontSize)) *
+                                  0.5f),
+             actionFontSize, ui::ActionButton::kYesText);
 
     DrawRectangleRounded(noButton, ui::ActionButton::kRoundness,
                          ui::ActionButton::kSegments,
@@ -1382,13 +1349,13 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                                 noHovered ? ui::ActionButton::kNegativeBorderHover
                                           : ui::ActionButton::kNegativeBorder);
     DrawText(noText,
-             static_cast<int>(
-                 noButton.x +
-                 (noButton.width - static_cast<float>(noTextWidth)) * 0.5f),
-             static_cast<int>(
-                 noButton.y +
-                 (noButton.height - static_cast<float>(actionFontSize)) * 0.5f),
-              actionFontSize, ui::ActionButton::kNoText);
+             static_cast<int>(noButton.x +
+                              (noButton.width - static_cast<float>(noTextWidth)) *
+                                  0.5f),
+             static_cast<int>(noButton.y +
+                              (noButton.height - static_cast<float>(actionFontSize)) *
+                                  0.5f),
+             actionFontSize, ui::ActionButton::kNoText);
   }
 
   if (showWindowSizeDialog) {
@@ -1400,7 +1367,8 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     const float uiScale = getUiScale();
 
     const int titleFontSize = static_cast<int>(ui::Dialog::kWindowTitleFont * uiScale);
-    const int optionFontSize = static_cast<int>(ui::Dialog::kWindowOptionFont * uiScale);
+    const int optionFontSize =
+        static_cast<int>(ui::Dialog::kWindowOptionFont * uiScale);
     const int closeFontSize = static_cast<int>(ui::Dialog::kWindowCloseFont * uiScale);
 
     DrawRectangleRounded(dialog, ui::Dialog::kRoundness,
@@ -1413,11 +1381,10 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     const int titleWidth = MeasureText(titleText, titleFontSize);
     DrawText(
         titleText,
-        static_cast<int>(
-            dialog.x + (dialog.width - static_cast<float>(titleWidth)) * 0.5f),
+        static_cast<int>(dialog.x + (dialog.width - static_cast<float>(titleWidth)) *
+                                      0.5f),
         static_cast<int>(dialog.y + ui::Dialog::kWindowSizeTitleY * uiScale),
-        titleFontSize,
-        ui::Dialog::kTextPrimary);
+        titleFontSize, ui::Dialog::kTextPrimary);
 
     for (int index = 0; index < ui::Window::kSizePresetCount; ++index) {
       const Rectangle optionRect = getWindowSizeOptionRect(index);
@@ -1440,9 +1407,9 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
           static_cast<int>(optionRect.x +
                            (optionRect.width - static_cast<float>(labelWidth)) *
                                0.5f),
-          static_cast<int>(
-              optionRect.y +
-              (optionRect.height - static_cast<float>(optionFontSize)) * 0.5f),
+          static_cast<int>(optionRect.y +
+                           (optionRect.height - static_cast<float>(optionFontSize)) *
+                               0.5f),
           optionFontSize, ui::Dialog::kTextPrimary);
     }
 
@@ -1463,9 +1430,9 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
         static_cast<int>(closeButton.x +
                          (closeButton.width - static_cast<float>(closeWidth)) *
                              0.5f),
-        static_cast<int>(
-            closeButton.y +
-            (closeButton.height - static_cast<float>(closeFontSize)) * 0.5f),
+        static_cast<int>(closeButton.y +
+                         (closeButton.height - static_cast<float>(closeFontSize)) *
+                             0.5f),
         closeFontSize, ui::Dialog::kCloseText);
   }
 
@@ -1488,14 +1455,11 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
     const int titleWidth = MeasureText(titleText, titleFontSize);
     DrawText(
         titleText,
-        static_cast<int>(
-            dialog.x + (dialog.width - static_cast<float>(titleWidth)) * 0.5f),
+        static_cast<int>(dialog.x + (dialog.width - static_cast<float>(titleWidth)) *
+                                      0.5f),
         static_cast<int>(dialog.y + ui::Dialog::kPromotionTitleY * uiScale),
-        titleFontSize,
-        ui::Dialog::kTextPrimary);
+        titleFontSize, ui::Dialog::kTextPrimary);
 
-    const PieceType options[ui::Dialog::kPromotionOptionCount] = {
-        PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
     for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
       const Rectangle optionRect = getPromotionOptionRect(index);
       const bool hovered = CheckCollisionPointRec(mousePos, optionRect);
@@ -1510,11 +1474,52 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                                   hovered ? ui::OptionButton::kBorderHover
                                           : ui::OptionButton::kBorder);
 
-      drawPiece(options[index], *promotionColor, optionRect.x, optionRect.y,
+      drawPiece(kPromotionOptions[index], *promotionColor, optionRect.x,
+                optionRect.y,
                 optionRect.width, optionRect.height,
                 ui::Dialog::kPromotionPieceScale);
     }
   }
+}
+
+void ChessView::update(const GameEvent &event) {
+  (void)event;
+}
+
+void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
+                          const std::vector<Move> &legalMoves,
+                          bool showRestartConfirm, bool showWindowSizeDialog,
+                          GameState gameState, const ChessColor *winnerColor,
+                          const CastlingTween *castlingTween,
+                          const DragPreview *dragPreview,
+                          const ChessColor *promotionColor,
+                          const Position *invalidHighlightSquare,
+                          const std::vector<CaptureEffect> &burningPieces,
+                          const CaptureEffect *captureCounterPopup) {
+  BeginDrawing();
+  ClearBackground({0, 0, 0, 255});
+
+  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween, dragPreview,
+                  invalidHighlightSquare, burningPieces, captureCounterPopup);
+  drawRightPanel(board);
+  drawDialogsAndOverlays(showRestartConfirm, showWindowSizeDialog, gameState,
+                         winnerColor, promotionColor);
 
   EndDrawing();
+}
+
+void ChessView::update(const Board &board, const Position *selectedSquare,
+                       const std::vector<Move> &legalMoves,
+                       bool showRestartConfirm, bool showWindowSizeDialog,
+                       GameState gameState, const ChessColor *winnerColor,
+                       const CastlingTween *castlingTween,
+                       const DragPreview *dragPreview,
+                       const ChessColor *promotionColor,
+                       const Position *invalidHighlightSquare,
+                       const std::vector<CaptureEffect> &burningPieces,
+                       const CaptureEffect *captureCounterPopup) {
+  drawBoard(board, selectedSquare, legalMoves, showRestartConfirm,
+            showWindowSizeDialog, gameState, winnerColor, castlingTween,
+            dragPreview, promotionColor, invalidHighlightSquare, burningPieces,
+            captureCounterPopup);
 }

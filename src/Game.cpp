@@ -218,19 +218,23 @@ bool Game::makeMove(const Move &move) {
   // 5) Record the move
   moveHistory_.push_back(move);
 
+  const ChessColor movingColor = currentTurn_;
+
   // 6) Switch turn
   currentTurn_ = oppositeColor(currentTurn_);
 
   // 7) Detect check / checkmate / stalemate for the next player
   updateGameState();
 
-  notifyMoveMade(move.from, move.to, isCapture);
+  notify({GameEventType::MoveMade, move.from, move.to, isCapture, movingColor});
   if (state_ == GameState::Check) {
-    notifyCheck(currentTurn_);
+    notify({GameEventType::Check, {}, {}, false, currentTurn_});
   } else if (state_ == GameState::Checkmate) {
-    notifyCheckmate(currentTurn_);
+    notify({GameEventType::Checkmate, {}, {}, false, currentTurn_});
   } else if (state_ == GameState::Stalemate) {
-    notifyStalemate();
+    notify({GameEventType::Stalemate, {}, {}, false, currentTurn_});
+  } else if (state_ == GameState::Draw) {
+    notify({GameEventType::Draw, {}, {}, false, currentTurn_});
   }
 
   return true;
@@ -264,42 +268,10 @@ void Game::detach(Observer *observer) {
                    observers_.end());
 }
 
-void Game::notifyMoveMade(Position from, Position to, bool isCapture) {
+void Game::notify(const GameEvent &event) {
   for (auto *observer : observers_) {
     if (observer != nullptr) {
-      observer->onMoveMade(from, to, isCapture);
-    }
-  }
-}
-
-void Game::notifyCheck(ChessColor color) {
-  for (auto *observer : observers_) {
-    if (observer != nullptr) {
-      observer->onCheck(color);
-    }
-  }
-}
-
-void Game::notifyCheckmate(ChessColor color) {
-  for (auto *observer : observers_) {
-    if (observer != nullptr) {
-      observer->onCheckmate(color);
-    }
-  }
-}
-
-void Game::notifyStalemate() {
-  for (auto *observer : observers_) {
-    if (observer != nullptr) {
-      observer->onStalemate();
-    }
-  }
-}
-
-void Game::notifyDraw() {
-  for (auto *observer : observers_) {
-    if (observer != nullptr) {
-      observer->onDraw();
+      observer->update(event);
     }
   }
 }

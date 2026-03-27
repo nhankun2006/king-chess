@@ -22,11 +22,7 @@ public:
   void unloadSounds();
 
   // Observer interface
-  void onMoveMade(Position from, Position to, bool isCapture) override;
-  void onCheck(ChessColor color) override { (void)color; }
-  void onCheckmate(ChessColor color) override { (void)color; }
-  void onStalemate() override {}
-  void onDraw() override {}
+  void update(const GameEvent &event) override;
 };
 
 #endif // CHESSSOUND_H

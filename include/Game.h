@@ -23,11 +23,7 @@ private:
   bool wouldBeInCheck(const Move &move, ChessColor color) const;
   void updateCastlingRights(const Move &move);
   void updateGameState();
-  void notifyMoveMade(Position from, Position to, bool isCapture);
-  void notifyCheck(ChessColor color);
-  void notifyCheckmate(ChessColor color);
-  void notifyStalemate();
-  void notifyDraw();
+  void notify(const GameEvent &event);
 
 public:
   Game();

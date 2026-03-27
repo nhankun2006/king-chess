@@ -154,10 +154,10 @@ void ChessController::run() {
       activeTweenPtr = &activeTween;
     }
 
-    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                     restartConfirmOpen_, windowSizeDialogOpen_, gameState,
-                     winnerColor, activeTweenPtr, dragPreview, promotionColor,
-                     invalidHighlight, burningPieces, captureCounterPopup);
+    view_->update(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                  restartConfirmOpen_, windowSizeDialogOpen_, gameState,
+                  winnerColor, activeTweenPtr, dragPreview, promotionColor,
+                  invalidHighlight, burningPieces, captureCounterPopup);
   };
 
   auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {

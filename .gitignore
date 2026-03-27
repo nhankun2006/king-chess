@@ -43,3 +43,4 @@ vcpkg_installed/
 .clangd
 chess.drawio
 Makefile
+.clang-format

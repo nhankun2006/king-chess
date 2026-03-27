@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "Observer.h"
 #include "Types.h"
 
 #include <raylib.h>
 
 #include "Board.h"
 #include "Move.h"
+#include "Observer.h"
 
 // ─── View-related data structs ──────────────────────────────────────────────
 
@@ -71,6 +71,28 @@ private:
   Rectangle getWindowSizeCloseButtonRect() const;
   Rectangle getPromotionDialogRect() const;
   Rectangle getPromotionOptionRect(int index) const;
+  int boardToDisplayIndex(int boardIndex) const;
+  Rectangle getDisplaySquareRect(int displayRow, int displayCol) const;
+  Rectangle getBoardSquareRect(Position boardPos) const;
+  static float clamp01(float value);
+
+  void drawBoardLayers(const Board &board, const Position *selectedSquare,
+                       const std::vector<Move> &legalMoves,
+                       const CastlingTween *castlingTween,
+                       const DragPreview *dragPreview,
+                       const Position *invalidHighlightSquare,
+                       const std::vector<CaptureEffect> &burningPieces,
+                       const CaptureEffect *captureCounterPopup);
+  void drawRightPanel(const Board &board);
+  void drawDialogsAndOverlays(bool showRestartConfirm,
+                              bool showWindowSizeDialog, GameState gameState,
+                              const ChessColor *winnerColor,
+                              const ChessColor *promotionColor);
+  int drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
+                          const char *title, ChessColor capturedColor,
+                          const std::map<PieceType, int> &captured);
+  int getCapturedSectionHeight(int sectionWidth,
+                               const std::map<PieceType, int> &captured) const;
 
 public:
   ChessView() = default;
@@ -90,6 +112,19 @@ public:
   bool screenToBoardSquare(float x, float y, Position &out) const;
   void drawPiece(PieceType type, ChessColor color, float x, float y, float w,
                  float h, float sizeMultiplier = 1.0f);
+  void update(const GameEvent &event) override;
+  void update(const Board &board, const Position *selectedSquare = nullptr,
+              const std::vector<Move> &legalMoves = {},
+              bool showRestartConfirm = false,
+              bool showWindowSizeDialog = false,
+              GameState gameState = GameState::Playing,
+              const ChessColor *winnerColor = nullptr,
+              const CastlingTween *castlingTween = nullptr,
+              const DragPreview *dragPreview = nullptr,
+              const ChessColor *promotionColor = nullptr,
+              const Position *invalidHighlightSquare = nullptr,
+              const std::vector<CaptureEffect> &burningPieces = {},
+              const CaptureEffect *captureCounterPopup = nullptr);
   void drawBoard(const Board &board, const Position *selectedSquare = nullptr,
                  const std::vector<Move> &legalMoves = {},
                  bool showRestartConfirm = false,
@@ -103,19 +138,6 @@ public:
                  const std::vector<CaptureEffect> &burningPieces = {},
                  const CaptureEffect *captureCounterPopup = nullptr);
 
-  void onMoveMade(Position from, Position to, bool isCapture) override {
-    (void)from;
-    (void)to;
-    (void)isCapture;
-  }
-
-  void onCheck(ChessColor color) override { (void)color; }
-
-  void onCheckmate(ChessColor color) override { (void)color; }
-
-  void onStalemate() override {}
-
-  void onDraw() override {}
 };
 
 #endif // CHESSVIEW_H
