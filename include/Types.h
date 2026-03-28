@@ -1,7 +1,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-enum class Color { White, Black };
+enum class ChessColor { White, Black };
 
 enum class PieceType { None, Pawn, Knight, Bishop, Rook, Queen, King };
 
@@ -21,8 +21,8 @@ struct Position {
 };
 
 // Helper to flip color
-inline Color oppositeColor(Color c) {
-  return (c == Color::White) ? Color::Black : Color::White;
+inline ChessColor oppositeColor(ChessColor c) {
+  return (c == ChessColor::White) ? ChessColor::Black : ChessColor::White;
 }
 
 #endif // TYPES_H

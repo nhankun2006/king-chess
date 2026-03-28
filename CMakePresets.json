@@ -14,7 +14,7 @@
         {
             "name": "mingw",
             "displayName": "MinGW 64-bit (Windows)",
-            "description": "Build with MinGW-w64 on Windows — gcc/g++ must be in PATH",
+            "description": "Debug build with MinGW-w64 + vcpkg on Windows",
             "inherits": "base-vcpkg",
             "generator": "MinGW Makefiles",
             "binaryDir": "${sourceDir}/build",
@@ -34,7 +34,7 @@
         {
             "name": "mingw-release",
             "displayName": "MinGW 64-bit Release (Windows)",
-            "description": "Optimized release build with MinGW-w64",
+            "description": "Optimized release build with MinGW-w64 + vcpkg",
             "inherits": "mingw",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
@@ -43,9 +43,9 @@
         {
             "name": "linux-debug",
             "displayName": "Linux Debug (GCC)",
-            "description": "Debug build on Linux with default system compiler",
+            "description": "Debug build on Linux with system raylib",
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build/linux-debug",
+            "binaryDir": "${sourceDir}/build",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -60,31 +60,6 @@
             "displayName": "Linux Release (GCC)",
             "description": "Optimized release build on Linux",
             "inherits": "linux-debug",
-            "binaryDir": "${sourceDir}/build/linux-release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "macos-debug",
-            "displayName": "macOS Debug (Clang)",
-            "description": "Debug build on macOS with default Apple Clang",
-            "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "macos-release",
-            "displayName": "macOS Release (Clang)",
-            "description": "Optimized release build on macOS",
-            "inherits": "macos-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -113,18 +88,6 @@
             "name": "linux-release-build",
             "displayName": "Build Release (Linux)",
             "configurePreset": "linux-release",
-            "jobs": 8
-        },
-        {
-            "name": "macos-build",
-            "displayName": "Build (macOS)",
-            "configurePreset": "macos-debug",
-            "jobs": 8
-        },
-        {
-            "name": "macos-release-build",
-            "displayName": "Build Release (macOS)",
-            "configurePreset": "macos-release",
             "jobs": 8
         }
     ]

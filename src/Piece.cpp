@@ -3,7 +3,7 @@
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 
-std::unique_ptr<Piece> Piece::create(PieceType type, Color color) {
+std::unique_ptr<Piece> Piece::create(PieceType type, ChessColor color) {
   switch (type) {
   case PieceType::Pawn:
     return std::make_unique<Pawn>(color);
@@ -25,7 +25,7 @@ std::unique_ptr<Piece> Piece::create(PieceType type, Color color) {
 // ─── Helper: add move if target square is empty or has an enemy ─────────────
 
 static bool addMoveIfValid(std::vector<Move> &moves, const Board &board,
-                           Position from, Position to, Color ownColor) {
+                           Position from, Position to, ChessColor ownColor) {
   if (!to.isValid())
     return false;
 
@@ -41,7 +41,8 @@ static bool addMoveIfValid(std::vector<Move> &moves, const Board &board,
 // ─── Helper: slide in a direction until blocked ─────────────────────────────
 
 static void addSlidingMoves(std::vector<Move> &moves, const Board &board,
-                            Position from, Color ownColor, int dRow, int dCol) {
+                            Position from, ChessColor ownColor, int dRow,
+                            int dCol) {
   Position to = {from.row + dRow, from.col + dCol};
   while (to.isValid()) {
     const Piece *target = board.getPieceAt(to);
@@ -60,9 +61,9 @@ static void addSlidingMoves(std::vector<Move> &moves, const Board &board,
 // ─── Pawn ───────────────────────────────────────────────────────────────────
 
 static void addPawnMoves(std::vector<Move> &moves, Position from, Position to,
-                         Color color) {
+                         ChessColor color) {
   // Check if this is a promotion rank
-  int promoRank = (color == Color::White) ? 7 : 0;
+  int promoRank = (color == ChessColor::White) ? 7 : 0;
   if (to.row == promoRank) {
     // Generate one move for each promotion choice
     for (PieceType pt : {PieceType::Queen, PieceType::Rook, PieceType::Bishop,
@@ -77,8 +78,8 @@ static void addPawnMoves(std::vector<Move> &moves, Position from, Position to,
 std::vector<Move> Pawn::getPossibleMoves(const Board &board,
                                          Position pos) const {
   std::vector<Move> moves;
-  int direction = (color_ == Color::White) ? 1 : -1;
-  int startRank = (color_ == Color::White) ? 1 : 6;
+  int direction = (color_ == ChessColor::White) ? 1 : -1;
+  int startRank = (color_ == ChessColor::White) ? 1 : 6;
 
   // 1) Single push forward
   Position oneStep = {pos.row + direction, pos.col};
@@ -189,7 +190,7 @@ std::vector<Move> King::getPossibleMoves(const Board &board,
   //    King must not have moved, and path must be clear.
   //    We do NOT check for check here — that's the Game's job.
   if (!moved_) {
-    int rank = (color_ == Color::White) ? 0 : 7;
+    int rank = (color_ == ChessColor::White) ? 0 : 7;
 
     // Kingside: king at e -> g, rook at h -> f
     const Piece *kRook = board.getPieceAt({rank, 7});

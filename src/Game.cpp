@@ -1,22 +1,25 @@
 #include "Game.h"
 
+#include <algorithm>
+#include <raylib.h>
+
 // ─── Constructor ────────────────────────────────────────────────────────────
 
 Game::Game() { board_.setupInitialPosition(); }
 
 // ─── Castling Rights Access ─────────────────────────────────────────────────
 
-bool Game::canCastleKingside(Color color) const {
-  return (color == Color::White) ? castlingRights_[0] : castlingRights_[2];
+bool Game::canCastleKingside(ChessColor color) const {
+  return (color == ChessColor::White) ? castlingRights_[0] : castlingRights_[2];
 }
 
-bool Game::canCastleQueenside(Color color) const {
-  return (color == Color::White) ? castlingRights_[1] : castlingRights_[3];
+bool Game::canCastleQueenside(ChessColor color) const {
+  return (color == ChessColor::White) ? castlingRights_[1] : castlingRights_[3];
 }
 
 // ─── Would a move leave the player in check? ────────────────────────────────
 
-bool Game::wouldBeInCheck(const Move &move, Color color) const {
+bool Game::wouldBeInCheck(const Move &move, ChessColor color) const {
   // Simulate the move on a copy of the board
   Board testBoard(board_);
   testBoard.executeMove(move);
@@ -50,7 +53,7 @@ std::vector<Move> Game::getLegalMoves(Position pos) const {
 
       // Can't castle through check
       int rank = move.from.row;
-      Color enemy = oppositeColor(currentTurn_);
+      ChessColor enemy = oppositeColor(currentTurn_);
       if (move.to.col == 6) {
         // Kingside: king passes through f-file
         if (board_.isSquareAttacked({rank, 5}, enemy))
@@ -75,7 +78,7 @@ std::vector<Move> Game::getLegalMoves(Position pos) const {
   return legalMoves;
 }
 
-std::vector<Move> Game::getAllLegalMoves(Color color) const {
+std::vector<Move> Game::getAllLegalMoves(ChessColor color) const {
   std::vector<Move> allMoves;
 
   // Temporary: we need to check moves for a specific color, which may differ
@@ -99,7 +102,7 @@ std::vector<Move> Game::getAllLegalMoves(Color color) const {
             continue;
 
           int rank = move.from.row;
-          Color enemy = oppositeColor(color);
+          ChessColor enemy = oppositeColor(color);
           if (move.to.col == 6) {
             if (board_.isSquareAttacked({rank, 5}, enemy))
               continue;
@@ -135,7 +138,7 @@ void Game::updateCastlingRights(const Move &move) {
 
   // King moved — lose both castling rights for that color
   if (movedPiece->getType() == PieceType::King) {
-    if (movedPiece->getColor() == Color::White) {
+    if (movedPiece->getColor() == ChessColor::White) {
       castlingRights_[0] = false; // White kingside
       castlingRights_[1] = false; // White queenside
     } else {
@@ -163,7 +166,7 @@ void Game::updateCastlingRights(const Move &move) {
 // ─── Game State Detection ───────────────────────────────────────────────────
 
 void Game::updateGameState() {
-  Color nextPlayer = currentTurn_; // called after turn switch
+  ChessColor nextPlayer = currentTurn_; // called after turn switch
   bool inCheck = board_.isInCheck(nextPlayer);
   auto legalMoves = getAllLegalMoves(nextPlayer);
 
@@ -177,6 +180,11 @@ void Game::updateGameState() {
 // ─── Make Move ──────────────────────────────────────────────────────────────
 
 bool Game::makeMove(const Move &move) {
+  if (state_ == GameState::Checkmate || state_ == GameState::Stalemate ||
+      state_ == GameState::Draw) {
+    return false;
+  }
+
   // 1) Verify the move is legal
   auto legalMoves = getLegalMoves(move.from);
   bool found = false;
@@ -189,21 +197,81 @@ bool Game::makeMove(const Move &move) {
   if (!found)
     return false;
 
-  // 2) Execute the move on the board
+  // 2) Detect capture before executing (target square or en passant)
+  bool isCapture = move.isEnPassant;
+  if (!isCapture) {
+    const Piece *targetPiece = board_.getPieceAt(move.to);
+    if (targetPiece != nullptr) {
+      const Piece *sourcePiece = board_.getPieceAt(move.from);
+      isCapture = (sourcePiece == nullptr) ||
+                  (targetPiece->getColor() != sourcePiece->getColor());
+    }
+  }
+
+  // 3) Execute the move on the board
   board_.executeMove(move);
 
-  // 3) Update castling rights (must be done after move execution
+  // 4) Update castling rights (must be done after move execution
   //    because we need to inspect the moved piece at its new position)
   updateCastlingRights(move);
 
-  // 4) Record the move
+  // 5) Record the move
   moveHistory_.push_back(move);
 
-  // 5) Switch turn
+  const ChessColor movingColor = currentTurn_;
+
+  // 6) Switch turn
   currentTurn_ = oppositeColor(currentTurn_);
 
-  // 6) Detect check / checkmate / stalemate for the next player
+  // 7) Detect check / checkmate / stalemate for the next player
   updateGameState();
 
+  notify({GameEventType::MoveMade, move.from, move.to, isCapture, movingColor});
+  if (state_ == GameState::Check) {
+    notify({GameEventType::Check, {}, {}, false, currentTurn_});
+  } else if (state_ == GameState::Checkmate) {
+    notify({GameEventType::Checkmate, {}, {}, false, currentTurn_});
+  } else if (state_ == GameState::Stalemate) {
+    notify({GameEventType::Stalemate, {}, {}, false, currentTurn_});
+  } else if (state_ == GameState::Draw) {
+    notify({GameEventType::Draw, {}, {}, false, currentTurn_});
+  }
+
   return true;
+}
+
+void Game::restart() {
+  board_.clear();
+  board_.setupInitialPosition();
+  currentTurn_ = ChessColor::White;
+  state_ = GameState::Playing;
+  moveHistory_.clear();
+  castlingRights_[0] = true;
+  castlingRights_[1] = true;
+  castlingRights_[2] = true;
+  castlingRights_[3] = true;
+}
+
+void Game::attach(Observer *observer) {
+  if (observer == nullptr) {
+    return;
+  }
+
+  const auto it = std::find(observers_.begin(), observers_.end(), observer);
+  if (it == observers_.end()) {
+    observers_.push_back(observer);
+  }
+}
+
+void Game::detach(Observer *observer) {
+  observers_.erase(std::remove(observers_.begin(), observers_.end(), observer),
+                   observers_.end());
+}
+
+void Game::notify(const GameEvent &event) {
+  for (auto *observer : observers_) {
+    if (observer != nullptr) {
+      observer->update(event);
+    }
+  }
 }

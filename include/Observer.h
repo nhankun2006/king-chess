@@ -3,14 +3,20 @@
 
 #include "Types.h"
 
+enum class GameEventType { MoveMade, Check, Checkmate, Stalemate, Draw };
+
+struct GameEvent {
+  GameEventType type = GameEventType::MoveMade;
+  Position from{};
+  Position to{};
+  bool isCapture = false;
+  ChessColor color = ChessColor::White;
+};
+
 class Observer {
 public:
   virtual ~Observer() = default;
-  virtual void onMoveMade(Position from, Position to) = 0;
-  virtual void onCheck(Color color) = 0;
-  virtual void onCheckmate(Color color) = 0;
-  virtual void onStalemate() = 0;
-  virtual void onDraw() = 0;
+  virtual void update(const GameEvent &event) = 0;
 };
 
 #endif // OBSERVER_H

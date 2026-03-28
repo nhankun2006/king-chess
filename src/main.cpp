@@ -1,28 +1,36 @@
 #include <cstdio>
 
-#define Color RaylibColor
 #include <raylib.h>
-#undef Color
 
 #include "ChessControllder.h"
+#include "ChessSound.h"
 #include "ChessView.h"
 #include "Game.h"
+#include "UIConfig.h"
 
 int main() {
-  InitWindow(512, 512, "King Chess");
+  SetConfigFlags(FLAG_VSYNC_HINT);
+  InitWindow(ui::Window::kInitialWidth, ui::Window::kInitialHeight,
+             "King Chess");
   if (!IsWindowReady()) {
     std::fprintf(stderr, "InitWindow failed\n");
     return 1;
   }
+
+  InitAudioDevice();
 
   const char *appDir = GetApplicationDirectory();
   if (appDir != nullptr && appDir[0] != '\0') {
     ChangeDirectory(appDir);
   }
 
-  SetTargetFPS(60);
+  SetTargetFPS(ui::Window::kTargetFps);
   Game game;
   ChessView view;
+  ChessSound sound;
+  sound.loadSounds();
+  game.attach(&view);
+  game.attach(&sound);
   ChessController controller(game, view);
 
   if (!view.LoadAssets()) {
@@ -39,12 +47,14 @@ int main() {
       DrawText("Press ESC to close.", 50, 320, 20, {230, 230, 230, 255});
       EndDrawing();
     }
+    CloseAudioDevice();
     CloseWindow();
     return 1;
   }
 
   controller.run();
 
+  CloseAudioDevice();
   CloseWindow();
   return 0;
 }
