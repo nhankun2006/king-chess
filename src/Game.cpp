@@ -1,6 +1,7 @@
 #include "Game.h"
 
 #include <algorithm>
+#include <fstream>
 #include <raylib.h>
 
 // ─── Constructor ────────────────────────────────────────────────────────────
@@ -250,6 +251,74 @@ void Game::restart() {
   castlingRights_[1] = true;
   castlingRights_[2] = true;
   castlingRights_[3] = true;
+}
+
+// ─── Persistence and Undo ───────────────────────────────────────────────────
+
+bool Game::saveGame(const std::string &filename) const {
+  std::ofstream out(filename, std::ios::binary);
+  if (!out)
+    return false;
+
+  size_t numMoves = moveHistory_.size();
+  out.write(reinterpret_cast<const char *>(&numMoves), sizeof(numMoves));
+
+  for (const auto &move : moveHistory_) {
+    out.write(reinterpret_cast<const char *>(&move), sizeof(Move));
+  }
+
+  return true;
+}
+
+bool Game::loadGame(const std::string &filename) {
+  std::ifstream in(filename, std::ios::binary);
+  if (!in)
+    return false;
+
+  size_t numMoves = 0;
+  if (!in.read(reinterpret_cast<char *>(&numMoves), sizeof(numMoves)))
+    return false;
+
+  std::vector<Move> loadedMoves;
+  for (size_t i = 0; i < numMoves; ++i) {
+    Move move;
+    if (!in.read(reinterpret_cast<char *>(&move), sizeof(Move)))
+      return false;
+    loadedMoves.push_back(move);
+  }
+
+  // Prevent UI updates and sounds during replay
+  auto savedObservers = observers_;
+  observers_.clear();
+
+  restart();
+  for (const auto &move : loadedMoves) {
+    makeMove(move);
+  }
+
+  observers_ = savedObservers;
+  notify({GameEventType::GameLoaded, {}, {}, false, currentTurn_});
+  return true;
+}
+
+bool Game::undo() {
+  if (moveHistory_.empty())
+    return false;
+
+  moveHistory_.pop_back();
+  auto movesToReplay = moveHistory_;
+
+  auto savedObservers = observers_;
+  observers_.clear();
+
+  restart();
+  for (const auto &move : movesToReplay) {
+    makeMove(move);
+  }
+
+  observers_ = savedObservers;
+  notify({GameEventType::GameLoaded, {}, {}, false, currentTurn_});
+  return true;
 }
 
 void Game::attach(Observer *observer) {
