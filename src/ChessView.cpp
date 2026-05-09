@@ -291,7 +291,7 @@ Rectangle ChessView::getSettingsButtonRect() const {
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
   const float buttonSize = ui::AutoLayout::IconButtonSize(m);
   const float buttonGap = ui::AutoLayout::IconButtonGap(m);
-  const float totalWidth = buttonSize * 3.0f + buttonGap * 2.0f;
+  const float totalWidth = buttonSize * 4.0f + buttonGap * 3.0f;
   const float startX = panel.x + (panel.width - totalWidth) * 0.5f;
   const float startY = ui::AutoLayout::IconButtonStartY(m);
   return {startX, startY, buttonSize, buttonSize};
@@ -311,6 +311,14 @@ Rectangle ChessView::getRestartButtonRect() const {
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
   return {rotateButton.x + rotateButton.width + ui::AutoLayout::IconButtonGap(m),
            rotateButton.y, rotateButton.width, rotateButton.height};
+}
+
+Rectangle ChessView::getUndoButtonRect() const {
+  const Rectangle restartButton = getRestartButtonRect();
+  const ui::AutoLayout::Metrics m =
+      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  return {restartButton.x + restartButton.width + ui::AutoLayout::IconButtonGap(m),
+          restartButton.y, restartButton.width, restartButton.height};
 }
 
 Rectangle ChessView::getRestartConfirmDialogRect() const {
@@ -455,6 +463,15 @@ bool ChessView::isRestartButtonClicked(float x, float y) const {
 
   return x >= restartButton.x && x <= restartButton.x + restartButton.width &&
          y >= restartButton.y && y <= restartButton.y + restartButton.height;
+}
+
+bool ChessView::isUndoButtonClicked(float x, float y) const {
+  const Rectangle undoButton = getUndoButtonRect();
+  if (undoButton.width <= 0.0f || undoButton.height <= 0.0f) {
+    return false;
+  }
+  return x >= undoButton.x && x <= undoButton.x + undoButton.width &&
+         y >= undoButton.y && y <= undoButton.y + undoButton.height;
 }
 
 int ChessView::getWindowSizeOptionClicked(float x, float y) const {
@@ -1061,9 +1078,11 @@ void ChessView::drawRightPanel(const Board &board) {
   const Rectangle settingsButton = getSettingsButtonRect();
   const Rectangle rotateButton = getRotateButtonRect();
   const Rectangle restartButton = getRestartButtonRect();
+  const Rectangle undoButton = getUndoButtonRect();
   const bool settingsHovered = CheckCollisionPointRec(mousePos, settingsButton);
   const bool rotateHovered = CheckCollisionPointRec(mousePos, rotateButton);
   const bool restartHovered = CheckCollisionPointRec(mousePos, restartButton);
+  const bool undoHovered = CheckCollisionPointRec(mousePos, undoButton);
 
   const float uiScale = getUiScale();
   const auto drawRoundedIconButton = [uiScale](Rectangle buttonRect, bool hovered) {
@@ -1089,6 +1108,7 @@ void ChessView::drawRightPanel(const Board &board) {
   drawRoundedIconButton(settingsButton, settingsHovered);
   drawRoundedIconButton(rotateButton, rotateHovered);
   drawRoundedIconButton(restartButton, restartHovered);
+  drawRoundedIconButton(undoButton, undoHovered);
 
   const float buttonIconSize = ui::IconButtons::kIconSize * uiScale;
 
@@ -1157,6 +1177,14 @@ void ChessView::drawRightPanel(const Board &board) {
                  ui::Dialog::kTextPrimary);
   }
 
+  DrawText("U",
+           static_cast<int>(undoButton.x +
+                            ui::IconButtons::kFallbackRotateLabelX * uiScale),
+           static_cast<int>(undoButton.y +
+                            ui::IconButtons::kFallbackRotateLabelY * uiScale),
+           static_cast<int>(ui::IconButtons::kIconSize * uiScale),
+           ui::Dialog::kTextPrimary);
+
   const auto drawCenteredHoverText = [this](Rectangle buttonRect, const char *text) {
     const int tooltipFontSize =
         static_cast<int>(ui::IconButtons::kTooltipFont * getUiScale());
@@ -1176,6 +1204,9 @@ void ChessView::drawRightPanel(const Board &board) {
   }
   if (settingsHovered) {
     drawCenteredHoverText(settingsButton, "Window size");
+  }
+  if (undoHovered) {
+    drawCenteredHoverText(undoButton, "Undo move");
   }
 
   const bool swapCapturedSections = isBoardFlipped_;
@@ -1506,20 +1537,4 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                          winnerColor, promotionColor);
 
   EndDrawing();
-}
-
-void ChessView::update(const Board &board, const Position *selectedSquare,
-                       const std::vector<Move> &legalMoves,
-                       bool showRestartConfirm, bool showWindowSizeDialog,
-                       GameState gameState, const ChessColor *winnerColor,
-                       const CastlingTween *castlingTween,
-                       const DragPreview *dragPreview,
-                       const ChessColor *promotionColor,
-                       const Position *invalidHighlightSquare,
-                       const std::vector<CaptureEffect> &burningPieces,
-                       const CaptureEffect *captureCounterPopup) {
-  drawBoard(board, selectedSquare, legalMoves, showRestartConfirm,
-            showWindowSizeDialog, gameState, winnerColor, castlingTween,
-            dragPreview, promotionColor, invalidHighlightSquare, burningPieces,
-            captureCounterPopup);
 }

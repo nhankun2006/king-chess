@@ -3,7 +3,7 @@
 
 #include "Types.h"
 
-enum class GameEventType { MoveMade, Check, Checkmate, Stalemate, Draw };
+enum class GameEventType { MoveMade, Check, Checkmate, Stalemate, Draw, GameLoaded };
 
 struct GameEvent {
   GameEventType type = GameEventType::MoveMade;

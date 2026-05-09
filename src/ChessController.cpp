@@ -45,6 +45,24 @@ void ChessController::run() {
 
   auto positionKey = [](Position pos) -> int { return pos.row * 8 + pos.col; };
 
+  auto triggerCapturePopup = [&](Position pos, int captureCount) {
+    if (captureCount >= 2) {
+      int effectiveCaptureCount = captureCount;
+      if (effectiveCaptureCount > 5) {
+        effectiveCaptureCount = 5;
+      }
+      delete captureCounterPopupSquare_;
+      captureCounterPopupSquare_ = new Position(pos);
+      captureCounterPopupCount_ = captureCount;
+      captureCounterPopupDurationSeconds_ =
+          ui::Animation::kCapturePopupDurationBaseFromMove +
+          ui::Animation::kCapturePopupDurationPerExtraCapture *
+              static_cast<float>(effectiveCaptureCount -
+                                 ui::CapturePopup::kStartCaptureCount);
+      captureCounterPopupStartTime_ = GetTime();
+    }
+  };
+
   auto updateCaptureStreaks = [&](const Move &move, bool wasCapture) -> int {
     const int fromKey = positionKey(move.from);
     const int toKey = positionKey(move.to);
@@ -154,10 +172,10 @@ void ChessController::run() {
       activeTweenPtr = &activeTween;
     }
 
-    view_->update(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
-                  restartConfirmOpen_, windowSizeDialogOpen_, gameState,
-                  winnerColor, activeTweenPtr, dragPreview, promotionColor,
-                  invalidHighlight, burningPieces, captureCounterPopup);
+    view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
+                     restartConfirmOpen_, windowSizeDialogOpen_, gameState,
+                     winnerColor, activeTweenPtr, dragPreview, promotionColor,
+                     invalidHighlight, burningPieces, captureCounterPopup);
   };
 
   auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {
@@ -206,22 +224,7 @@ void ChessController::run() {
               }
               const int captureCount = updateCaptureStreaks(move, willCapture);
               if (willCapture) {
-                if (captureCount >= 2) {
-                  int effectiveCaptureCount = captureCount;
-                  if (effectiveCaptureCount > 5) {
-                    effectiveCaptureCount = 5;
-                  }
-                  delete captureCounterPopupSquare_;
-                  captureCounterPopupSquare_ = new Position(move.to);
-                  captureCounterPopupCount_ = captureCount;
-                  captureCounterPopupDurationSeconds_ =
-                      ui::Animation::kCapturePopupDurationBaseFromMove +
-                      ui::Animation::kCapturePopupDurationPerExtraCapture *
-                          static_cast<float>(
-                              effectiveCaptureCount -
-                              ui::CapturePopup::kStartCaptureCount);
-                  captureCounterPopupStartTime_ = GetTime();
-                }
+                triggerCapturePopup(move.to, captureCount);
               }
               promotionPromptOpen_ = false;
               pendingPromotionMoves_.clear();
@@ -295,6 +298,14 @@ void ChessController::run() {
         stopDragging();
         windowSizeDialogOpen_ = false;
         restartConfirmOpen_ = true;
+        handledUiClick = true;
+      }
+
+      if (!handledUiClick &&
+          view_->isUndoButtonClicked(mousePos.x, mousePos.y)) {
+        stopDragging();
+        windowSizeDialogOpen_ = false;
+        game_->undo();
         handledUiClick = true;
       }
 
@@ -405,21 +416,7 @@ void ChessController::run() {
         const int captureCount =
             updateCaptureStreaks(attemptedMove, wasCapture);
         if (wasCapture) {
-          if (captureCount >= 2) {
-            int effectiveCaptureCount = captureCount;
-            if (effectiveCaptureCount > 5) {
-              effectiveCaptureCount = 5;
-            }
-            delete captureCounterPopupSquare_;
-            captureCounterPopupSquare_ = new Position(attemptedMove.to);
-            captureCounterPopupCount_ = captureCount;
-            captureCounterPopupDurationSeconds_ =
-                ui::Animation::kCapturePopupDurationBaseFromMove +
-                ui::Animation::kCapturePopupDurationPerExtraCapture *
-                    static_cast<float>(effectiveCaptureCount -
-                                       ui::CapturePopup::kStartCaptureCount);
-            captureCounterPopupStartTime_ = GetTime();
-          }
+          triggerCapturePopup(attemptedMove.to, captureCount);
         }
         if (attemptedMove.isCastling && selectedPiece != nullptr &&
             selectedPiece->getType() == PieceType::King) {

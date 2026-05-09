@@ -45,6 +45,11 @@ public:
   // Execute a move; returns false if the move is illegal
   bool makeMove(const Move &move);
   void restart();
+  
+  // Persistence and Undo
+  bool saveGame(const std::string &filename) const;
+  bool loadGame(const std::string &filename);
+  bool undo();
 
   // Observer pattern
   void attach(Observer *observer);

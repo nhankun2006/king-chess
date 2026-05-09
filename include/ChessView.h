@@ -63,6 +63,7 @@ private:
   Rectangle getBoardGridRect() const;
   Rectangle getRotateButtonRect() const;
   Rectangle getRestartButtonRect() const;
+  Rectangle getUndoButtonRect() const;
   Rectangle getRestartConfirmDialogRect() const;
   Rectangle getRestartConfirmYesButtonRect() const;
   Rectangle getRestartConfirmNoButtonRect() const;
@@ -104,6 +105,7 @@ public:
   bool isSettingsButtonClicked(float x, float y) const;
   bool isRotateButtonClicked(float x, float y) const;
   bool isRestartButtonClicked(float x, float y) const;
+  bool isUndoButtonClicked(float x, float y) const;
   bool isRestartConfirmYesClicked(float x, float y) const;
   bool isRestartConfirmNoClicked(float x, float y) const;
   int getWindowSizeOptionClicked(float x, float y) const;
@@ -113,18 +115,7 @@ public:
   void drawPiece(PieceType type, ChessColor color, float x, float y, float w,
                  float h, float sizeMultiplier = 1.0f);
   void update(const GameEvent &event) override;
-  void update(const Board &board, const Position *selectedSquare = nullptr,
-              const std::vector<Move> &legalMoves = {},
-              bool showRestartConfirm = false,
-              bool showWindowSizeDialog = false,
-              GameState gameState = GameState::Playing,
-              const ChessColor *winnerColor = nullptr,
-              const CastlingTween *castlingTween = nullptr,
-              const DragPreview *dragPreview = nullptr,
-              const ChessColor *promotionColor = nullptr,
-              const Position *invalidHighlightSquare = nullptr,
-              const std::vector<CaptureEffect> &burningPieces = {},
-              const CaptureEffect *captureCounterPopup = nullptr);
+
   void drawBoard(const Board &board, const Position *selectedSquare = nullptr,
                  const std::vector<Move> &legalMoves = {},
                  bool showRestartConfirm = false,
