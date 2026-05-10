@@ -1,4 +1,4 @@
-#include "ChessControllder.h"
+#include "ChessController.h"
 
 #include "UIConfig.h"
 
