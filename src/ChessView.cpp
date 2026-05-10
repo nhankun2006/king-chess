@@ -9,6 +9,13 @@ constexpr PieceType kPromotionOptions[ui::Dialog::kPromotionOptionCount] = {
     PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
 }
 
+ChessView::ChessView()
+    : castlingTweenDurationSeconds_(ui::Animation::kCastlingTweenDurationSeconds),
+      invalidHighlightDurationSeconds_(
+          ui::Animation::kInvalidHighlightDurationSeconds),
+      captureCounterPopupDurationSeconds_(
+          ui::Animation::kCapturePopupDurationSeconds) {}
+
 ChessView::~ChessView() {
   if (boardTexture_.id != 0) {
     UnloadTexture(boardTexture_);
@@ -440,6 +447,8 @@ Rectangle ChessView::getBoardSquareRect(Position boardPos) const {
                               boardToDisplayIndex(boardPos.col));
 }
 
+int ChessView::positionKey(Position pos) { return pos.row * 8 + pos.col; }
+
 float ChessView::clamp01(float value) {
   if (value < 0.0f) {
     return 0.0f;
@@ -448,6 +457,78 @@ float ChessView::clamp01(float value) {
     return 1.0f;
   }
   return value;
+}
+
+const CastlingTween *ChessView::getActiveCastlingTween() {
+  if (!castlingTween_.has_value()) {
+    return nullptr;
+  }
+
+  CastlingTween &tween = castlingTween_.value();
+  const double elapsed = GetTime() - castlingTweenStartTime_;
+  tween.progress = static_cast<float>(elapsed / castlingTweenDurationSeconds_);
+  if (tween.progress >= 1.0f) {
+    castlingTween_.reset();
+    return nullptr;
+  }
+  if (tween.progress < 0.0f) {
+    tween.progress = 0.0f;
+  }
+  return &tween;
+}
+
+const Position *ChessView::getActiveInvalidHighlightSquare() {
+  if (!invalidHighlightSquare_.has_value()) {
+    return nullptr;
+  }
+
+  const double elapsed = GetTime() - invalidHighlightStartTime_;
+  if (elapsed > invalidHighlightDurationSeconds_) {
+    invalidHighlightSquare_.reset();
+    return nullptr;
+  }
+
+  return &invalidHighlightSquare_.value();
+}
+
+const CaptureEffect *ChessView::getActiveCaptureCounterPopup(
+    CaptureEffect &popupOut) {
+  if (!captureCounterPopupSquare_.has_value() || captureCounterPopupCount_ < 2) {
+    return nullptr;
+  }
+
+  const double elapsed = GetTime() - captureCounterPopupStartTime_;
+  const float progress =
+      static_cast<float>(elapsed / captureCounterPopupDurationSeconds_);
+  if (progress >= 1.0f) {
+    captureCounterPopupSquare_.reset();
+    captureCounterPopupCount_ = 0;
+    return nullptr;
+  }
+
+  popupOut.pos = captureCounterPopupSquare_.value();
+  popupOut.captureCount = captureCounterPopupCount_;
+  popupOut.progress = (progress < 0.0f) ? 0.0f : progress;
+  return &popupOut;
+}
+
+std::vector<CaptureEffect> ChessView::collectBurningPieces(const Board &board) const {
+  std::vector<CaptureEffect> burningPieces;
+  for (const auto &[key, captureCount] : pieceCaptureCounts_) {
+    if (captureCount < 2) {
+      continue;
+    }
+    const Position pos{key / 8, key % 8};
+    if (board.getPieceAt(pos) != nullptr) {
+      burningPieces.push_back({pos, captureCount});
+    }
+  }
+  return burningPieces;
+}
+
+bool ChessView::shouldShowSaveMessage() const {
+  const double saveElapsed = GetTime() - saveMessageStartTime_;
+  return saveElapsed < saveMessageDurationSeconds_;
 }
 
 bool ChessView::isSettingsButtonClicked(float x, float y) const {
@@ -1559,24 +1640,117 @@ void ChessView::update(const GameEvent &event) {
   (void)event;
 }
 
+void ChessView::triggerCastlingTween(ChessColor color, Position kingFrom,
+                                     Position kingTo, Position rookFrom,
+                                     Position rookTo) {
+  CastlingTween tween;
+  tween.color = color;
+  tween.kingFrom = kingFrom;
+  tween.kingTo = kingTo;
+  tween.rookFrom = rookFrom;
+  tween.rookTo = rookTo;
+  tween.progress = 0.0f;
+  castlingTween_ = tween;
+  castlingTweenStartTime_ = GetTime();
+}
+
+void ChessView::triggerInvalidHighlight(Position square) {
+  invalidHighlightSquare_ = square;
+  invalidHighlightStartTime_ = GetTime();
+}
+
+void ChessView::onMoveApplied(const Move &move, bool wasCapture) {
+  const int fromKey = positionKey(move.from);
+  const int toKey = positionKey(move.to);
+
+  int movingPieceCaptureCount = 0;
+  const auto fromIt = pieceCaptureCounts_.find(fromKey);
+  if (fromIt != pieceCaptureCounts_.end()) {
+    movingPieceCaptureCount = fromIt->second;
+    pieceCaptureCounts_.erase(fromIt);
+  }
+
+  if (wasCapture) {
+    movingPieceCaptureCount += 1;
+  }
+  pieceCaptureCounts_[toKey] = movingPieceCaptureCount;
+
+  if (move.isCastling) {
+    const int rookFromCol = (move.to.col == 6) ? 7 : 0;
+    const int rookToCol = (move.to.col == 6) ? 5 : 3;
+    const Position rookFrom{move.from.row, rookFromCol};
+    const Position rookTo{move.from.row, rookToCol};
+
+    const int rookFromKey = positionKey(rookFrom);
+    const int rookToKey = positionKey(rookTo);
+
+    int rookCaptureCount = 0;
+    const auto rookIt = pieceCaptureCounts_.find(rookFromKey);
+    if (rookIt != pieceCaptureCounts_.end()) {
+      rookCaptureCount = rookIt->second;
+      pieceCaptureCounts_.erase(rookIt);
+    }
+    pieceCaptureCounts_[rookToKey] = rookCaptureCount;
+  }
+
+  if (wasCapture && movingPieceCaptureCount >= 2) {
+    int effectiveCaptureCount = movingPieceCaptureCount;
+    if (effectiveCaptureCount > 5) {
+      effectiveCaptureCount = 5;
+    }
+    captureCounterPopupSquare_ = move.to;
+    captureCounterPopupCount_ = movingPieceCaptureCount;
+    captureCounterPopupDurationSeconds_ =
+        ui::Animation::kCapturePopupDurationBaseFromMove +
+        ui::Animation::kCapturePopupDurationPerExtraCapture *
+            static_cast<float>(effectiveCaptureCount -
+                               ui::CapturePopup::kStartCaptureCount);
+    captureCounterPopupStartTime_ = GetTime();
+  }
+}
+
+void ChessView::clearCaptureEffects() {
+  pieceCaptureCounts_.clear();
+  captureCounterPopupSquare_.reset();
+  captureCounterPopupCount_ = 0;
+}
+
+void ChessView::triggerSaveMessage() { saveMessageStartTime_ = GetTime(); }
+
+void ChessView::resetVisualEffects() {
+  castlingTween_.reset();
+  invalidHighlightSquare_.reset();
+  clearCaptureEffects();
+}
+
 void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                           const std::vector<Move> &legalMoves,
                           bool showRestartConfirm, bool showWindowSizeDialog,
                           GameState gameState, const ChessColor *winnerColor,
-                          const CastlingTween *castlingTween,
                           const DragPreview *dragPreview,
                           const ChessColor *promotionColor,
-                          const Position *invalidHighlightSquare,
-                          const std::vector<CaptureEffect> &burningPieces,
-                          const CaptureEffect *captureCounterPopup) {
-  BeginDrawing();
-  ClearBackground({0, 0, 0, 255});
+                          bool showSaveMessage) {
+  const CastlingTween *castlingTween = getActiveCastlingTween();
+  const Position *invalidHighlightSquare = getActiveInvalidHighlightSquare();
+  const std::vector<CaptureEffect> burningPieces = collectBurningPieces(board);
+  CaptureEffect captureCounterPopupValue;
+  const CaptureEffect *captureCounterPopup =
+      getActiveCaptureCounterPopup(captureCounterPopupValue);
 
-  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween, dragPreview,
-                  invalidHighlightSquare, burningPieces, captureCounterPopup);
+  ClearBackground({0, 0, 0, 255});
+  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween,
+                  dragPreview, invalidHighlightSquare, burningPieces,
+                  captureCounterPopup);
   drawRightPanel(board);
   drawDialogsAndOverlays(showRestartConfirm, showWindowSizeDialog, gameState,
                          winnerColor, promotionColor);
 
-  EndDrawing();
+  if (showSaveMessage && shouldShowSaveMessage()) {
+    const char *txt = "Game saved to save.bin";
+    DrawRectangleRec({static_cast<float>(GetScreenWidth() / 2 - 160),
+                      static_cast<float>(GetScreenHeight() - 80), 320.0f, 40.0f},
+                     {20, 20, 20, 180});
+    DrawText(txt, GetScreenWidth() / 2 - MeasureText(txt, 18) / 2,
+             GetScreenHeight() - 72, 18, RAYWHITE);
+  }
 }

@@ -2,10 +2,6 @@
 
 #include <raylib.h>
 
-#include "ChessControllder.h"
-#include "ChessSound.h"
-#include "ChessView.h"
-#include "Game.h"
 #include "UIConfig.h"
 #include "App.h"
 

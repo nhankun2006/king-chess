@@ -14,7 +14,6 @@ public:
     MenuController(MenuModel* model, MenuView* view) 
         : model_(model), view_(view) {}
     
-    // Xử lý logic input và yêu cầu chuyển cảnh nếu cần
     void processInput(SceneManager* manager);
 };
 

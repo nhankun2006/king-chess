@@ -12,7 +12,6 @@ public:
     Rectangle getLoadGameBtnRect() const;
     Rectangle getBackBtnRect() const;
 
-    // View nhận Model để biết trạng thái mà vẽ tương ứng
     void render(const MenuModel& model) const;
 };
 

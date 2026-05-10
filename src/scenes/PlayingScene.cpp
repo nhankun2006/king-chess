@@ -1,75 +1,70 @@
 #include "scenes/PlayingScene.h"
-#include "ChessSound.h"
-#include <memory>
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
-    : game_(nullptr), view_(nullptr), controller_(nullptr), mode_(mode), isLoaded_(loadSave) {}
+    : mode_(mode), shouldLoadSave_(loadSave) {}
 
 PlayingScene::~PlayingScene() {
-    // Ensure game is saved when the playing scene is destroyed (exit or scene switch)
-    if (game_ != nullptr) {
-        game_->saveGame("save.bin");
-    }
-    delete controller_;
-    delete view_;
-    delete game_;
+  if (game_ != nullptr) {
+    game_->saveGame("save.bin");
+  }
 }
 
-void PlayingScene::update(SceneManager* manager) {
-    // If not started, initialize game and run the blocking controller loop
-    if (game_ == nullptr) {
-        game_ = new Game();
-        view_ = new ChessView();
-        ChessSound* sound = new ChessSound();
-        sound->loadSounds();
-        game_->attach(view_);
-        game_->attach(sound);
+void PlayingScene::update(SceneManager *manager) {
+  if (!initialized_) {
+    game_ = std::make_unique<Game>();
+    view_ = std::make_unique<ChessView>();
+    sound_ = std::make_unique<ChessSound>();
+    sound_->loadSounds();
 
-        if (!view_->LoadAssets()) {
-            // Failed to load assets: return to menu
-            delete sound;
-            manager->changeScene(SceneType::MAIN_MENU);
-            return;
-        }
+    game_->attach(view_.get());
+    game_->attach(sound_.get());
 
-        controller_ = new ChessController(*game_, *view_);
-
-        // If load flag set, attempt to load save (Game::loadFromFile assumed)
-        if (isLoaded_) {
-            // Use Game's load mechanism
-            bool ok = game_->loadGame("save.bin");
-            if (!ok) {
-                // Show a brief error message and return to main menu
-                const char* msg = "Failed to load save.bin - returning to menu";
-                const double start = GetTime();
-                while (GetTime() - start < 1.5 && !WindowShouldClose()) {
-                    BeginDrawing();
-                    ClearBackground({30, 30, 30, 255});
-                    DrawText(msg, GetScreenWidth() / 2 - MeasureText(msg, 20) / 2,
-                             GetScreenHeight() / 2 - 10, 20, RAYWHITE);
-                    EndDrawing();
-                }
-                manager->changeScene(SceneType::MAIN_MENU);
-                return;
-            }
-        }
-
-        // Run the game's own loop (blocking). When it returns, go back to main menu.
-        controller_->run();
-
-        if (WindowShouldClose()) {
-            manager->quit();
-        } else {
-            manager->changeScene(SceneType::MAIN_MENU);
-        }
+    if (!view_->LoadAssets()) {
+      manager->changeScene(SceneType::MAIN_MENU);
+      initialized_ = true;
+      return;
     }
+
+    controller_ = std::make_unique<ChessController>(*game_, *view_);
+
+    if (shouldLoadSave_ && !game_->loadGame("save.bin")) {
+      loadFailed_ = true;
+      loadFailStartTime_ = GetTime();
+    }
+
+    initialized_ = true;
+  }
+
+  if (loadFailed_) {
+    if (GetTime() - loadFailStartTime_ >= kLoadFailMessageDurationSeconds_) {
+      manager->changeScene(SceneType::MAIN_MENU);
+    }
+    return;
+  }
+
+  if (controller_ != nullptr && controller_->processInput()) {
+    manager->changeScene(SceneType::MAIN_MENU);
+  }
 }
 
 void PlayingScene::render() {
-    // Optionally show a loading message before the controller starts
-    if (game_ == nullptr) {
-        ClearBackground(BLACK);
-        const char* txt = "Starting game...";
-        DrawText(txt, GetScreenWidth()/2 - MeasureText(txt, 20)/2, GetScreenHeight()/2 - 10, 20, WHITE);
-    }
+  if (!initialized_) {
+    ClearBackground(BLACK);
+    const char *txt = "Starting game...";
+    DrawText(txt, GetScreenWidth() / 2 - MeasureText(txt, 20) / 2,
+             GetScreenHeight() / 2 - 10, 20, WHITE);
+    return;
+  }
+
+  if (loadFailed_) {
+    ClearBackground({30, 30, 30, 255});
+    DrawText(kLoadFailMessage_,
+             GetScreenWidth() / 2 - MeasureText(kLoadFailMessage_, 20) / 2,
+             GetScreenHeight() / 2 - 10, 20, RAYWHITE);
+    return;
+  }
+
+  if (controller_ != nullptr) {
+    controller_->render();
+  }
 }
