@@ -291,7 +291,8 @@ Rectangle ChessView::getSettingsButtonRect() const {
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
   const float buttonSize = ui::AutoLayout::IconButtonSize(m);
   const float buttonGap = ui::AutoLayout::IconButtonGap(m);
-  const float totalWidth = buttonSize * 4.0f + buttonGap * 3.0f;
+  // Grid 2x2 layout instead of 1x4
+  const float totalWidth = buttonSize * 2.0f + buttonGap;
   const float startX = panel.x + (panel.width - totalWidth) * 0.5f;
   const float startY = ui::AutoLayout::IconButtonStartY(m);
   return {startX, startY, buttonSize, buttonSize};
@@ -306,19 +307,21 @@ Rectangle ChessView::getRotateButtonRect() const {
 }
 
 Rectangle ChessView::getRestartButtonRect() const {
-  const Rectangle rotateButton = getRotateButtonRect();
+  const Rectangle settingsButton = getSettingsButtonRect();
   const ui::AutoLayout::Metrics m =
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
-  return {rotateButton.x + rotateButton.width + ui::AutoLayout::IconButtonGap(m),
-           rotateButton.y, rotateButton.width, rotateButton.height};
+  return {settingsButton.x,
+           settingsButton.y + settingsButton.height + ui::AutoLayout::IconButtonGap(m),
+           settingsButton.width, settingsButton.height};
 }
 
 Rectangle ChessView::getUndoButtonRect() const {
-  const Rectangle restartButton = getRestartButtonRect();
+  const Rectangle rotateButton = getRotateButtonRect();
   const ui::AutoLayout::Metrics m =
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
-  return {restartButton.x + restartButton.width + ui::AutoLayout::IconButtonGap(m),
-          restartButton.y, restartButton.width, restartButton.height};
+  return {rotateButton.x,
+          rotateButton.y + rotateButton.height + ui::AutoLayout::IconButtonGap(m),
+          rotateButton.width, rotateButton.height};
 }
 
 Rectangle ChessView::getRestartConfirmDialogRect() const {
@@ -358,9 +361,9 @@ Rectangle ChessView::getWindowSizeDialogRect() const {
 
 Rectangle ChessView::getWindowSizeOptionRect(int index) const {
   const Rectangle dialog = getWindowSizeDialogRect();
-  constexpr float kHeightRatio = 40.0f / 270.0f;
-  constexpr float kGapRatio = 10.0f / 270.0f;
-  constexpr float kStartYRatio = 54.0f / 270.0f;
+  constexpr float kHeightRatio = 40.0f / 340.0f;
+  constexpr float kGapRatio = 10.0f / 340.0f;
+  constexpr float kStartYRatio = 54.0f / 340.0f;
   constexpr float kPadXRatio = 24.0f / 340.0f;
   const float optionHeight = dialog.height * kHeightRatio;
   const float gap = dialog.height * kGapRatio;
@@ -380,6 +383,19 @@ Rectangle ChessView::getWindowSizeCloseButtonRect() const {
   return {dialog.x + dialog.width - buttonSize - margin,
           dialog.y + margin, buttonSize,
           buttonSize};
+}
+
+Rectangle ChessView::getExitToMenuButtonRect() const {
+  const Rectangle dialog = getWindowSizeDialogRect();
+  constexpr float kHeightRatio = 40.0f / 340.0f;
+  constexpr float kPadXRatio = 24.0f / 340.0f;
+  constexpr float kBottomMarginRatio = 24.0f / 340.0f;
+  
+  const float buttonHeight = dialog.height * kHeightRatio;
+  const float padX = dialog.width * kPadXRatio;
+  const float y = dialog.y + dialog.height - buttonHeight - (dialog.height * kBottomMarginRatio);
+  
+  return {dialog.x + padX, y, dialog.width - 2.0f * padX, buttonHeight};
 }
 
 Rectangle ChessView::getPromotionDialogRect() const {
@@ -501,6 +517,12 @@ bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
   const Rectangle closeButton = getWindowSizeCloseButtonRect();
   return x >= closeButton.x && x <= closeButton.x + closeButton.width &&
          y >= closeButton.y && y <= closeButton.y + closeButton.height;
+}
+
+bool ChessView::isExitToMenuButtonClicked(float x, float y) const {
+  const Rectangle btn = getExitToMenuButtonRect();
+  return x >= btn.x && x <= btn.x + btn.width &&
+         y >= btn.y && y <= btn.y + btn.height;
 }
 
 bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
@@ -1085,6 +1107,7 @@ void ChessView::drawRightPanel(const Board &board) {
   const bool undoHovered = CheckCollisionPointRec(mousePos, undoButton);
 
   const float uiScale = getUiScale();
+  
   const auto drawRoundedIconButton = [uiScale](Rectangle buttonRect, bool hovered) {
     if (hovered) {
       const float boost = ui::IconButtons::kHoverBoost * uiScale;
@@ -1408,7 +1431,7 @@ void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
                                 ui::Dialog::kRoundSegments,
                                 ui::Dialog::kBorderWidth, ui::Dialog::kBorder);
 
-    const char *titleText = "Window size";
+    const char *titleText = "Settings";
     const int titleWidth = MeasureText(titleText, titleFontSize);
     DrawText(
         titleText,
@@ -1443,6 +1466,25 @@ void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
                                0.5f),
           optionFontSize, ui::Dialog::kTextPrimary);
     }
+
+    const Rectangle exitBtn = getExitToMenuButtonRect();
+    const bool exitHovered = CheckCollisionPointRec(mousePos, exitBtn);
+    DrawRectangleRounded(exitBtn, ui::OptionButton::kRoundness,
+                         ui::OptionButton::kSegments,
+                         exitHovered ? ui::OptionButton::kFillHover
+                                     : ui::OptionButton::kFill);
+    DrawRectangleRoundedLinesEx(exitBtn, ui::OptionButton::kRoundness,
+                                ui::OptionButton::kSegments,
+                                ui::OptionButton::kBorderWidth,
+                                exitHovered ? ui::OptionButton::kBorderHover
+                                        : ui::OptionButton::kBorder);
+    const char *exitText = "Return to Main Menu";
+    const int exitLabelWidth = MeasureText(exitText, optionFontSize);
+    DrawText(
+        exitText,
+        static_cast<int>(exitBtn.x + (exitBtn.width - static_cast<float>(exitLabelWidth)) * 0.5f),
+        static_cast<int>(exitBtn.y + (exitBtn.height - static_cast<float>(optionFontSize)) * 0.5f),
+        optionFontSize, ui::Dialog::kTextPrimary);
 
     const bool closeHovered = CheckCollisionPointRec(mousePos, closeButton);
     DrawRectangleRounded(closeButton, ui::ActionButton::kRoundness,

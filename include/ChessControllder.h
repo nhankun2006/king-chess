@@ -34,7 +34,15 @@ private:
   int captureCounterPopupCount_ = 0;
   double captureCounterPopupStartTime_ = 0.0;
   float captureCounterPopupDurationSeconds_ = ui::Animation::kCapturePopupDurationSeconds;
+  // Quick-save feedback
+  double saveMessageStartTime_ = 0.0;
+  float saveMessageDurationSeconds_ = 1.2f;
 
+  // Autosave settings
+  bool autosaveOnMove_ = true;
+  bool autosavePeriodic_ = false;
+  double lastAutosaveTime_ = 0.0;
+  float autosaveIntervalSeconds_ = 30.0f; // seconds
   void updateSelection(Position pos);
   void clearSelection();
 

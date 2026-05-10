@@ -1,5 +1,5 @@
 #include "ChessControllder.h"
-
+#include <cstdio>
 #include "UIConfig.h"
 
 void ChessController::updateSelection(Position pos) {
@@ -44,6 +44,7 @@ void ChessController::run() {
   };
 
   auto positionKey = [](Position pos) -> int { return pos.row * 8 + pos.col; };
+  // Quick-save hotkey (handled inside the main loop instead)
 
   auto triggerCapturePopup = [&](Position pos, int captureCount) {
     if (captureCount >= 2) {
@@ -207,6 +208,24 @@ void ChessController::run() {
   };
 
   while (!WindowShouldClose()) {
+    // Quick-save hotkey: press 'S' to save current game to save.bin
+    if (IsKeyPressed(KEY_S)) {
+      const bool ok = game_->saveGame("save.bin");
+      saveMessageStartTime_ = GetTime();
+    }
+
+    // Periodic autosave (if enabled)
+    if (autosavePeriodic_) {
+      const double now = GetTime();
+      if (now - lastAutosaveTime_ >= autosaveIntervalSeconds_) {
+        game_->saveGame("save.bin");
+        saveMessageStartTime_ = now;
+        lastAutosaveTime_ = now;
+      }
+    }
+
+    // Track whether a move was made this frame to trigger autosave-on-move
+    bool movedThisFrame = false;
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
       const Vector2 mousePos = GetMousePosition();
 
@@ -261,6 +280,8 @@ void ChessController::run() {
       if (windowSizeDialogOpen_) {
         if (view_->isWindowSizeDialogCloseClicked(mousePos.x, mousePos.y)) {
           windowSizeDialogOpen_ = false;
+        } else if (view_->isExitToMenuButtonClicked(mousePos.x, mousePos.y)) {
+          break; // Return to main menu
         } else {
           const int selectedSizeOpt =
               view_->getWindowSizeOptionClicked(mousePos.x, mousePos.y);
@@ -269,6 +290,12 @@ void ChessController::run() {
               const ui::WindowPreset preset =
                   ui::Window::kSizePresets[selectedSizeOpt];
               SetWindowSize(preset.width, preset.height);
+              
+              FILE* f = fopen("settings.ini", "w");
+              if (f) {
+                fprintf(f, "%d %d\n", preset.width, preset.height);
+                fclose(f);
+              }
             }
             windowSizeDialogOpen_ = false;
           }
@@ -407,31 +434,29 @@ void ChessController::run() {
         } else {
           attemptedMoveIsCapture = willCapture;
           hasAttemptedMoveIsCapture = true;
-        }
-      }
+          movedThisFrame = true;
 
-      if (!promotionPromptOpen_ && hasAttemptedMove) {
-        const bool wasCapture =
-            hasAttemptedMoveIsCapture ? attemptedMoveIsCapture : false;
-        const int captureCount =
-            updateCaptureStreaks(attemptedMove, wasCapture);
-        if (wasCapture) {
-          triggerCapturePopup(attemptedMove.to, captureCount);
-        }
-        if (attemptedMove.isCastling && selectedPiece != nullptr &&
-            selectedPiece->getType() == PieceType::King) {
-          CastlingTween tween;
-          tween.color = selectedPiece->getColor();
-          tween.kingFrom = attemptedMove.from;
-          tween.kingTo = attemptedMove.to;
-          const int rookFromCol = (attemptedMove.to.col == 6) ? 7 : 0;
-          const int rookToCol = (attemptedMove.to.col == 6) ? 5 : 3;
-          tween.rookFrom = {attemptedMove.from.row, rookFromCol};
-          tween.rookTo = {attemptedMove.from.row, rookToCol};
-          tween.progress = 0.0f;
-          delete castlingTween_;
-          castlingTween_ = new CastlingTween(tween);
-          castlingTweenStartTime_ = GetTime();
+          const bool wasCapture = hasAttemptedMoveIsCapture ? attemptedMoveIsCapture : false;
+          const int captureCount = updateCaptureStreaks(attemptedMove, wasCapture);
+          if (wasCapture) {
+            triggerCapturePopup(attemptedMove.to, captureCount);
+          }
+
+          if (attemptedMove.isCastling && selectedPiece != nullptr &&
+              selectedPiece->getType() == PieceType::King) {
+            CastlingTween tween;
+            tween.color = selectedPiece->getColor();
+            tween.kingFrom = attemptedMove.from;
+            tween.kingTo = attemptedMove.to;
+            const int rookFromCol = (attemptedMove.to.col == 6) ? 7 : 0;
+            const int rookToCol = (attemptedMove.to.col == 6) ? 5 : 3;
+            tween.rookFrom = {attemptedMove.from.row, rookFromCol};
+            tween.rookTo = {attemptedMove.from.row, rookToCol};
+            tween.progress = 0.0f;
+            delete castlingTween_;
+            castlingTween_ = new CastlingTween(tween);
+            castlingTweenStartTime_ = GetTime();
+          }
         }
       } else if (!promotionPromptOpen_) {
         if (hasDropSquare && selectedSquare_ != nullptr &&
@@ -447,5 +472,21 @@ void ChessController::run() {
     }
 
     drawFrame();
+
+    // Autosave after successful moves (if enabled)
+    if (movedThisFrame && autosaveOnMove_) {
+      game_->saveGame("save.bin");
+      saveMessageStartTime_ = GetTime();
+    }
+
+    // Draw quick-save / autosave feedback if active
+    const double saveElapsed = GetTime() - saveMessageStartTime_;
+    if (saveElapsed < saveMessageDurationSeconds_) {
+      const char *txt = "Game saved to save.bin";
+      DrawRectangleRec({(float)(GetScreenWidth()/2 - 160), (float)(GetScreenHeight() - 80), 320, 40}, {20,20,20,180});
+      DrawText(txt, GetScreenWidth()/2 - MeasureText(txt, 18)/2, GetScreenHeight() - 72, 18, RAYWHITE);
+    }
   }
+  // Save on exit as a final backup
+  game_->saveGame("save.bin");
 }

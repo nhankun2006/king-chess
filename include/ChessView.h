@@ -70,6 +70,7 @@ private:
   Rectangle getWindowSizeDialogRect() const;
   Rectangle getWindowSizeOptionRect(int index) const;
   Rectangle getWindowSizeCloseButtonRect() const;
+  Rectangle getExitToMenuButtonRect() const;
   Rectangle getPromotionDialogRect() const;
   Rectangle getPromotionOptionRect(int index) const;
   int boardToDisplayIndex(int boardIndex) const;
@@ -110,6 +111,7 @@ public:
   bool isRestartConfirmNoClicked(float x, float y) const;
   int getWindowSizeOptionClicked(float x, float y) const;
   bool isWindowSizeDialogCloseClicked(float x, float y) const;
+  bool isExitToMenuButtonClicked(float x, float y) const;
   PieceType getPromotionOptionClicked(float x, float y) const;
   bool screenToBoardSquare(float x, float y, Position &out) const;
   void drawPiece(PieceType type, ChessColor color, float x, float y, float w,

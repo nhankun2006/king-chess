@@ -3,6 +3,7 @@
 
 #include "scenes/Scene.h"
 #include "scenes/MainMenuScene.h" // For PlayMode
+#include "scenes/SceneManager.h"
 #include "Game.h"
 #include "ChessView.h"
 #include "ChessControllder.h"
@@ -19,7 +20,7 @@ public:
     PlayingScene(PlayMode mode, bool loadSave);
     ~PlayingScene() override;
 
-    void update(App* app) override;
+    void update(SceneManager* manager) override;
     void render() override;
 };
 

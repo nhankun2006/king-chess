@@ -7,11 +7,25 @@
 #include "ChessView.h"
 #include "Game.h"
 #include "UIConfig.h"
+#include "App.h"
 
 int main() {
   SetConfigFlags(FLAG_VSYNC_HINT);
-  InitWindow(ui::Window::kInitialWidth, ui::Window::kInitialHeight,
-             "King Chess");
+  
+  const char *appDir = GetApplicationDirectory();
+  if (appDir != nullptr && appDir[0] != '\0') {
+    ChangeDirectory(appDir);
+  }
+
+  int initWidth = ui::Window::kInitialWidth;
+  int initHeight = ui::Window::kInitialHeight;
+  FILE* f = fopen("settings.ini", "r");
+  if (f) {
+    fscanf(f, "%d %d", &initWidth, &initHeight);
+    fclose(f);
+  }
+
+  InitWindow(initWidth, initHeight, "King Chess");
   if (!IsWindowReady()) {
     std::fprintf(stderr, "InitWindow failed\n");
     return 1;
@@ -19,40 +33,11 @@ int main() {
 
   InitAudioDevice();
 
-  const char *appDir = GetApplicationDirectory();
-  if (appDir != nullptr && appDir[0] != '\0') {
-    ChangeDirectory(appDir);
-  }
-
   SetTargetFPS(ui::Window::kTargetFps);
-  Game game;
-  ChessView view;
-  ChessSound sound;
-  sound.loadSounds();
-  game.attach(&view);
-  game.attach(&sound);
-  ChessController controller(game, view);
 
-  if (!view.LoadAssets()) {
-    std::fprintf(stderr, "Failed to load chess assets: %s\n",
-                 view.getLastAssetError().c_str());
-    while (!WindowShouldClose()) {
-      BeginDrawing();
-      ClearBackground({20, 20, 20, 255});
-      DrawText("Failed to load assets.", 50, 220, 24, {255, 80, 80, 255});
-      DrawText(view.getLastAssetError().c_str(), 20, 255, 16,
-               {230, 230, 230, 255});
-      DrawText("Make sure build/assets/images exists.", 50, 290, 20,
-               {230, 230, 230, 255});
-      DrawText("Press ESC to close.", 50, 320, 20, {230, 230, 230, 255});
-      EndDrawing();
-    }
-    CloseAudioDevice();
-    CloseWindow();
-    return 1;
-  }
-
-  controller.run();
+  // Use App / SceneManager based flow
+  App app;
+  app.run();
 
   CloseAudioDevice();
   CloseWindow();
