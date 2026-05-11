@@ -5,9 +5,9 @@
 
 #include <raylib.h>
 
-PromotionInteractionState::PromotionInteractionState(
-    std::vector<Move> promotionMoves, ChessColor color)
-    : pendingMoves_(std::move(promotionMoves)), color_(color) {}
+PromotionInteractionState::PromotionInteractionState(Position from, Position to,
+                                                     ChessColor color)
+    : from_(from), to_(to), color_(color) {}
 
 bool PromotionInteractionState::handleInput(ChessController &ctrl) {
   if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -19,17 +19,14 @@ bool PromotionInteractionState::handleInput(ChessController &ctrl) {
       ctrl.view_->getPromotionOptionClicked(mousePos.x, mousePos.y);
 
   if (selectedPromotion != PieceType::None) {
-    for (const auto &move : pendingMoves_) {
-      if (move.promotion != selectedPromotion) {
-        continue;
-      }
-      if (ctrl.applyMove(move)) {
-        ctrl.promotionPromptOpen_ = false;
-        ctrl.clearSelection();
-        ctrl.stopDragging();
-        ctrl.setState(std::make_unique<IdleInteractionState>());
-        return false;
-      }
+    // Ask the Game model to resolve the exact move — no manual filtering
+    auto move = ctrl.game_->resolveLegalMove(from_, to_, selectedPromotion);
+    if (move.has_value() && ctrl.applyMove(move.value())) {
+      ctrl.promotionPromptOpen_ = false;
+      ctrl.clearSelection();
+      ctrl.stopDragging();
+      ctrl.setState(std::make_unique<IdleInteractionState>());
+      return false;
     }
   } else {
     ctrl.triggerInvalidMoveWarning(std::nullopt);

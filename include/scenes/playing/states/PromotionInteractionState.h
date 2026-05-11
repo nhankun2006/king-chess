@@ -2,20 +2,20 @@
 #define PROMOTIONINTERACTIONSTATE_H
 
 #include "scenes/playing/ChessControllerState.h"
-#include "chess/model/Move.h"
 #include "chess/model/Types.h"
 
-#include <vector>
-
+/// State active while the promotion dialog is displayed.
+/// Stores the from/to squares and delegates piece-type resolution
+/// to Game::resolveLegalMove() — the controller never filters moves itself.
 class PromotionInteractionState : public ChessControllerState {
 public:
-  PromotionInteractionState(std::vector<Move> promotionMoves,
-                            ChessColor color);
+  PromotionInteractionState(Position from, Position to, ChessColor color);
 
   bool handleInput(ChessController &ctrl) override;
 
 private:
-  std::vector<Move> pendingMoves_;
+  Position from_;
+  Position to_;
   ChessColor color_;
 };
 

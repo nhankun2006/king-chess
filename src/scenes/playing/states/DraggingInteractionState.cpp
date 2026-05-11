@@ -21,47 +21,25 @@ bool DraggingInteractionState::handleInput(ChessController &ctrl) {
   const bool hasDropSquare =
       ctrl.view_->screenToBoardSquare(mousePos.x, mousePos.y, dropSquare);
 
-  const Piece *selectedPiece =
-      ctrl.selectedSquare_.has_value()
-          ? ctrl.game_->getBoard().getPieceAt(ctrl.selectedSquare_.value())
-          : nullptr;
-
   bool movedThisFrame = false;
 
-  if (hasDropSquare && selectedPiece != nullptr) {
-    std::vector<Move> candidateMoves;
-    for (const auto &legalMove : ctrl.selectedLegalMoves_) {
-      if (legalMove.to == dropSquare) {
-        candidateMoves.push_back(legalMove);
-      }
+  if (hasDropSquare && ctrl.selectedSquare_.has_value()) {
+    const Position from = ctrl.selectedSquare_.value();
+
+    // Delegate rule-level queries to the Game model
+    if (ctrl.game_->hasPromotionChoices(from, dropSquare)) {
+      // Transition to promotion dialog
+      ctrl.promotionPromptOpen_ = true;
+      ctrl.promotionPromptColor_ = dragPieceColor_;
+      ctrl.stopDragging();
+      ctrl.setState(std::make_unique<PromotionInteractionState>(
+          from, dropSquare, dragPieceColor_));
+      return false;
     }
 
-    if (!candidateMoves.empty()) {
-      // Non-promotion move (single candidate or non-pawn)
-      if (candidateMoves.size() == 1 ||
-          selectedPiece->getType() != PieceType::Pawn) {
-        movedThisFrame = ctrl.applyMove(candidateMoves.front());
-      } else {
-        // Check whether the candidates include promotions
-        std::vector<Move> promotionMoves;
-        for (const auto &move : candidateMoves) {
-          if (move.promotion != PieceType::None) {
-            promotionMoves.push_back(move);
-          }
-        }
-
-        if (!promotionMoves.empty()) {
-          // Transition to promotion dialog
-          ctrl.promotionPromptOpen_ = true;
-          ctrl.promotionPromptColor_ = selectedPiece->getColor();
-          ctrl.stopDragging();
-          ctrl.setState(std::make_unique<PromotionInteractionState>(
-              std::move(promotionMoves), selectedPiece->getColor()));
-          return false;
-        }
-        // Multiple non-promotion candidates (shouldn't normally happen)
-        movedThisFrame = ctrl.applyMove(candidateMoves.front());
-      }
+    auto move = ctrl.game_->resolveLegalMove(from, dropSquare);
+    if (move.has_value()) {
+      movedThisFrame = ctrl.applyMove(move.value());
     }
   }
 

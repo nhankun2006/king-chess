@@ -14,6 +14,7 @@ class DraggingInteractionState;
 class PromotionInteractionState;
 class RestartModalInteractionState;
 class WindowModalInteractionState;
+class BotTurnState;
 class ChessControllerState;
 
 class ChessController {
@@ -32,6 +33,7 @@ private:
   friend class PromotionInteractionState;
   friend class RestartModalInteractionState;
   friend class WindowModalInteractionState;
+  friend class BotTurnState;
 
   Game *game_ = nullptr;
   ChessView *view_ = nullptr;
@@ -52,8 +54,8 @@ private:
 
   bool promotionPromptOpen_ = false;
   ChessColor promotionPromptColor_ = ChessColor::White;
-  Position promotionFrom_{};
-  Position promotionTo_{};
+
+  bool botThinking_ = false;
 
   // Autosave settings
   bool autosaveOnMove_ = true;
@@ -70,7 +72,7 @@ private:
   bool isInputBlockedByUi() const;
   bool isHumanVsBotMatch() const;
   bool undoForCurrentMode();
-  bool applyAutomatedMoveIfNeeded();
+  bool gameIsPlayable() const;
   void setState(std::unique_ptr<ChessControllerState> nextState);
 
 public:

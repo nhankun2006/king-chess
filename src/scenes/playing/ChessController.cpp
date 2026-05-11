@@ -4,10 +4,10 @@
 
 #include "config/UIConfig.h"
 #include "scenes/playing/ChessControllerState.h"
+#include "scenes/playing/states/BotTurnState.h"
 #include "scenes/playing/states/IdleInteractionState.h"
 
-// ─── Construction / Destruction ─────────────────────────────────────────────
-
+// Construction / Destruction
 ChessController::ChessController(Game &game, ChessView &view,
                                  std::unique_ptr<IPlayerAgent> whitePlayer,
                                  std::unique_ptr<IPlayerAgent> blackPlayer)
@@ -19,13 +19,12 @@ ChessController::ChessController(Game &game, ChessView &view,
 
 ChessController::~ChessController() = default;
 
-// ─── State machine ──────────────────────────────────────────────────────────
-
+// State machine
 void ChessController::setState(std::unique_ptr<ChessControllerState> nextState) {
   state_ = std::move(nextState);
 }
 
-// ─── Selection helpers ──────────────────────────────────────────────────────
+// Selection helpers
 
 void ChessController::updateSelection(Position pos) {
   selectedSquare_ = pos;
@@ -43,8 +42,7 @@ void ChessController::stopDragging() {
   dragPieceType_ = PieceType::None;
 }
 
-// ─── Move execution ─────────────────────────────────────────────────────────
-
+// Move execution
 bool ChessController::applyMove(const Move &move) {
   const bool willCapture =
       move.isEnPassant ||
@@ -77,8 +75,7 @@ bool ChessController::applyMove(const Move &move) {
   return true;
 }
 
-// ─── Player agent helpers ───────────────────────────────────────────────────
-
+// Player agent helpers
 const IPlayerAgent *ChessController::currentPlayer() const {
   return (game_->getCurrentTurn() == ChessColor::White)
              ? whitePlayer_.get()
@@ -114,27 +111,10 @@ bool ChessController::undoForCurrentMode() {
   return false;
 }
 
-bool ChessController::applyAutomatedMoveIfNeeded() {
-  const IPlayerAgent *player = currentPlayer();
-  if (player == nullptr || !player->isAutomated()) {
-    return false;
-  }
-  if (isInputBlockedByUi()) {
-    return false;
-  }
-  if (game_->getState() == GameState::Checkmate ||
-      game_->getState() == GameState::Stalemate ||
-      game_->getState() == GameState::Draw) {
-    return false;
-  }
-
-  // const_cast because chooseMove is non-const (may update internal state)
-  auto optMove =
-      const_cast<IPlayerAgent *>(player)->chooseMove(*game_);
-  if (optMove.has_value()) {
-    return applyMove(optMove.value());
-  }
-  return false;
+bool ChessController::gameIsPlayable() const {
+  const GameState gs = game_->getState();
+  return gs != GameState::Checkmate && gs != GameState::Stalemate &&
+         gs != GameState::Draw;
 }
 
 // ─── Feedback helpers ───────────────────────────────────────────────────────
@@ -180,8 +160,14 @@ bool ChessController::processInput() {
     }
   }
 
-  // Let the bot play if it is its turn
-  applyAutomatedMoveIfNeeded();
+  // Auto-transition to BotTurnState when it is an automated player's turn
+  if (!botThinking_ && !isInputBlockedByUi() && gameIsPlayable()) {
+    const IPlayerAgent *player = currentPlayer();
+    if (player != nullptr && player->isAutomated()) {
+      botThinking_ = true;
+      setState(std::make_unique<BotTurnState>());
+    }
+  }
 
   // Delegate to the active interaction state
   if (state_) {
@@ -190,8 +176,7 @@ bool ChessController::processInput() {
   return false;
 }
 
-// ─── Read-only accessors for PlayingScene ───────────────────────────────────
-
+// Read-only accessors for PlayingScene
 const std::optional<Position> &ChessController::getSelectedSquare() const {
   return selectedSquare_;
 }
