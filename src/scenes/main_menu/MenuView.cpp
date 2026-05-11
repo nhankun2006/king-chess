@@ -1,4 +1,5 @@
 #include "scenes/main_menu/MenuView.h"
+#include "scenes/PlayMode.h"
 #include "scenes/main_menu/MainMenuScene.h"
 #include "config/UIConfig.h"
 #include <string>

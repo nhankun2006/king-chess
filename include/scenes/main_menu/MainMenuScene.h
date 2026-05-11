@@ -3,14 +3,14 @@
 
 #include "core/Scene.h"
 #include "core/SceneManager.h"
+#include "scenes/PlayMode.h"
 #include <raylib.h>
 #include <memory>
 #include "scenes/main_menu/MenuModel.h"
 #include "scenes/main_menu/MenuView.h"
 #include "scenes/main_menu/MenuController.h"
 
-// Simple enums used by menu and playing scenes
-enum class PlayMode { PvP, PvE };
+// Simple enum used by main menu scene
 enum class MenuState { MAIN, SELECT_MODE };
 
 class MainMenuScene : public Scene {

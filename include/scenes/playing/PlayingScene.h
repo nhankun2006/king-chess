@@ -2,7 +2,7 @@
 #define PLAYINGSCENE_H
 
 #include "core/Scene.h"
-#include "scenes/main_menu/MainMenuScene.h" // For PlayMode
+#include "scenes/PlayMode.h"
 #include "core/SceneManager.h"
 #include <memory>
 #include "chess/model/Game.h"
