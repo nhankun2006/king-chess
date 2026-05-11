@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "Types.h"
+#include "chess/model/Types.h"
 
 #include <raylib.h>
 
-#include "Board.h"
-#include "Move.h"
-#include "Observer.h"
+#include "chess/model/Board.h"
+#include "chess/model/Move.h"
+#include "chess/model/Observer.h"
 
 // ─── View-related data structs ──────────────────────────────────────────────
 

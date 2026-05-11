@@ -1,4 +1,4 @@
-#include "scenes/PlayingScene.h"
+#include "scenes/playing/PlayingScene.h"
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
     : mode_(mode), shouldLoadSave_(loadSave) {}

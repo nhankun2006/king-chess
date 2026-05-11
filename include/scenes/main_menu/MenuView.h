@@ -2,7 +2,7 @@
 #define MENUVIEW_H
 
 #include <raylib.h>
-#include "scenes/MenuModel.h"
+#include "scenes/main_menu/MenuModel.h"
 
 class MenuView {
 public:

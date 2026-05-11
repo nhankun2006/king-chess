@@ -1,7 +1,7 @@
 #ifndef OBSERVER_H
 #define OBSERVER_H
 
-#include "Types.h"
+#include "chess/model/Types.h"
 
 enum class GameEventType { MoveMade, Check, Checkmate, Stalemate, Draw, GameLoaded };
 

@@ -1,8 +1,8 @@
-#include "ChessView.h"
+#include "scenes/playing/ChessView.h"
 
 #include <cmath>
 
-#include "UIConfig.h"
+#include "config/UIConfig.h"
 
 namespace {
 constexpr PieceType kPromotionOptions[ui::Dialog::kPromotionOptionCount] = {

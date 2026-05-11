@@ -1,4 +1,4 @@
-#include "scenes/MainMenuScene.h"
+#include "scenes/main_menu/MainMenuScene.h"
 
 MainMenuScene::MainMenuScene() {
     model_ = std::make_unique<MenuModel>();

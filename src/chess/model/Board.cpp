@@ -1,4 +1,4 @@
-#include "Board.h"
+#include "chess/model/Board.h"
 #include <sstream>
 
 // ─── Constructor ────────────────────────────────────────────────────────────

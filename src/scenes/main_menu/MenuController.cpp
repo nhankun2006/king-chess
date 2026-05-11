@@ -1,6 +1,6 @@
-#include "scenes/MenuController.h"
-#include "scenes/MainMenuScene.h"
-#include "UIConfig.h"
+#include "scenes/main_menu/MenuController.h"
+#include "scenes/main_menu/MainMenuScene.h"
+#include "config/UIConfig.h"
 #include <raylib.h>
 
 MenuController::MenuController(MenuModel* model, MenuView* view)

@@ -1,8 +1,8 @@
-#include "ChessController.h"
+#include "scenes/playing/ChessController.h"
 
 #include <cstdio>
 
-#include "UIConfig.h"
+#include "config/UIConfig.h"
 
 void ChessController::updateSelection(Position pos) {
   selectedSquare_ = pos;

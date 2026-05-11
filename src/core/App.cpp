@@ -1,6 +1,6 @@
-#include "App.h"
-#include "scenes/MainMenuScene.h"
-#include "scenes/PlayingScene.h"
+#include "core/App.h"
+#include "scenes/main_menu/MainMenuScene.h"
+#include "scenes/playing/PlayingScene.h"
 
 #include <memory>
 

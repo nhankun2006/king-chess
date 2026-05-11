@@ -2,8 +2,8 @@
 
 #include <raylib.h>
 
-#include "UIConfig.h"
-#include "App.h"
+#include "config/UIConfig.h"
+#include "core/App.h"
 
 int main() {
   SetConfigFlags(FLAG_VSYNC_HINT);

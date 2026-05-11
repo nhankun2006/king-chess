@@ -1,4 +1,4 @@
-#include "Game.h"
+#include "chess/model/Game.h"
 
 #include <algorithm>
 #include <fstream>

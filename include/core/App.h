@@ -3,8 +3,8 @@
 
 #include <raylib.h>
 #include <memory>
-#include "scenes/SceneManager.h"
-#include "scenes/Scene.h"
+#include "core/SceneManager.h"
+#include "core/Scene.h"
 
 class App : public SceneManager {
 private:

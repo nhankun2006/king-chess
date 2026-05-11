@@ -1,6 +1,6 @@
-#include "scenes/MenuView.h"
-#include "scenes/MainMenuScene.h"
-#include "UIConfig.h"
+#include "scenes/main_menu/MenuView.h"
+#include "scenes/main_menu/MainMenuScene.h"
+#include "config/UIConfig.h"
 #include <string>
 
 static Rectangle makeButton(float centerX, float centerY, int idx, float btnWidth, float btnHeight, float btnGap) {

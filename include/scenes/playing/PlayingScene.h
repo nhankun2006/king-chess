@@ -1,14 +1,14 @@
 #ifndef PLAYINGSCENE_H
 #define PLAYINGSCENE_H
 
-#include "scenes/Scene.h"
-#include "scenes/MainMenuScene.h" // For PlayMode
-#include "scenes/SceneManager.h"
+#include "core/Scene.h"
+#include "scenes/main_menu/MainMenuScene.h" // For PlayMode
+#include "core/SceneManager.h"
 #include <memory>
-#include "Game.h"
-#include "ChessView.h"
-#include "ChessController.h"
-#include "ChessSound.h"
+#include "chess/model/Game.h"
+#include "scenes/playing/ChessView.h"
+#include "scenes/playing/ChessController.h"
+#include "services/ChessSound.h"
 
 class PlayingScene : public Scene {
 private:

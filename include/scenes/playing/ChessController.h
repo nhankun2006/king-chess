@@ -4,8 +4,8 @@
 #include <optional>
 #include <vector>
 
-#include "ChessView.h"
-#include "Game.h"
+#include "scenes/playing/ChessView.h"
+#include "chess/model/Game.h"
 
 class ChessController {
 private:
