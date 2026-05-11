@@ -1,9 +1,9 @@
 #ifndef BOARD_H
 #define BOARD_H
 
-#include "Types.h"
-#include "Move.h"
-#include "Piece.h"
+#include "chess/model/Types.h"
+#include "chess/model/Move.h"
+#include "chess/model/Piece.h"
 #include <memory>
 #include <string>
 
