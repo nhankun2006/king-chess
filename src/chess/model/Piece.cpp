@@ -1,5 +1,5 @@
-#include "Piece.h"
-#include "Board.h"
+#include "chess/model/Piece.h"
+#include "chess/model/Board.h"
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 

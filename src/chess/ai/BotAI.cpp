@@ -1,4 +1,4 @@
-#include "BotAI.h"
+#include "chess/ai/BotAI.h"
 
 #include <algorithm>
 #include <limits>

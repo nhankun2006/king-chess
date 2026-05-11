@@ -1,7 +1,7 @@
 #ifndef CHESSSOUND_H
 #define CHESSSOUND_H
 
-#include "Observer.h"
+#include "chess/model/Observer.h"
 
 #include <raylib.h>
 

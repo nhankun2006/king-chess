@@ -1,13 +1,20 @@
-#include "ChessView.h"
+#include "scenes/playing/ChessView.h"
 
 #include <cmath>
 
-#include "UIConfig.h"
+#include "config/UIConfig.h"
 
 namespace {
 constexpr PieceType kPromotionOptions[ui::Dialog::kPromotionOptionCount] = {
     PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight};
 }
+
+ChessView::ChessView()
+    : castlingTweenDurationSeconds_(ui::Animation::kCastlingTweenDurationSeconds),
+      invalidHighlightDurationSeconds_(
+          ui::Animation::kInvalidHighlightDurationSeconds),
+      captureCounterPopupDurationSeconds_(
+          ui::Animation::kCapturePopupDurationSeconds) {}
 
 ChessView::~ChessView() {
   if (boardTexture_.id != 0) {
@@ -291,7 +298,8 @@ Rectangle ChessView::getSettingsButtonRect() const {
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
   const float buttonSize = ui::AutoLayout::IconButtonSize(m);
   const float buttonGap = ui::AutoLayout::IconButtonGap(m);
-  const float totalWidth = buttonSize * 4.0f + buttonGap * 3.0f;
+  // Grid 2x2 layout instead of 1x4
+  const float totalWidth = buttonSize * 2.0f + buttonGap;
   const float startX = panel.x + (panel.width - totalWidth) * 0.5f;
   const float startY = ui::AutoLayout::IconButtonStartY(m);
   return {startX, startY, buttonSize, buttonSize};
@@ -306,19 +314,21 @@ Rectangle ChessView::getRotateButtonRect() const {
 }
 
 Rectangle ChessView::getRestartButtonRect() const {
-  const Rectangle rotateButton = getRotateButtonRect();
+  const Rectangle settingsButton = getSettingsButtonRect();
   const ui::AutoLayout::Metrics m =
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
-  return {rotateButton.x + rotateButton.width + ui::AutoLayout::IconButtonGap(m),
-           rotateButton.y, rotateButton.width, rotateButton.height};
+  return {settingsButton.x,
+           settingsButton.y + settingsButton.height + ui::AutoLayout::IconButtonGap(m),
+           settingsButton.width, settingsButton.height};
 }
 
 Rectangle ChessView::getUndoButtonRect() const {
-  const Rectangle restartButton = getRestartButtonRect();
+  const Rectangle rotateButton = getRotateButtonRect();
   const ui::AutoLayout::Metrics m =
       ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
-  return {restartButton.x + restartButton.width + ui::AutoLayout::IconButtonGap(m),
-          restartButton.y, restartButton.width, restartButton.height};
+  return {rotateButton.x,
+          rotateButton.y + rotateButton.height + ui::AutoLayout::IconButtonGap(m),
+          rotateButton.width, rotateButton.height};
 }
 
 Rectangle ChessView::getRestartConfirmDialogRect() const {
@@ -358,9 +368,9 @@ Rectangle ChessView::getWindowSizeDialogRect() const {
 
 Rectangle ChessView::getWindowSizeOptionRect(int index) const {
   const Rectangle dialog = getWindowSizeDialogRect();
-  constexpr float kHeightRatio = 40.0f / 270.0f;
-  constexpr float kGapRatio = 10.0f / 270.0f;
-  constexpr float kStartYRatio = 54.0f / 270.0f;
+  constexpr float kHeightRatio = 40.0f / 340.0f;
+  constexpr float kGapRatio = 10.0f / 340.0f;
+  constexpr float kStartYRatio = 54.0f / 340.0f;
   constexpr float kPadXRatio = 24.0f / 340.0f;
   const float optionHeight = dialog.height * kHeightRatio;
   const float gap = dialog.height * kGapRatio;
@@ -380,6 +390,19 @@ Rectangle ChessView::getWindowSizeCloseButtonRect() const {
   return {dialog.x + dialog.width - buttonSize - margin,
           dialog.y + margin, buttonSize,
           buttonSize};
+}
+
+Rectangle ChessView::getExitToMenuButtonRect() const {
+  const Rectangle dialog = getWindowSizeDialogRect();
+  constexpr float kHeightRatio = 40.0f / 340.0f;
+  constexpr float kPadXRatio = 24.0f / 340.0f;
+  constexpr float kBottomMarginRatio = 24.0f / 340.0f;
+  
+  const float buttonHeight = dialog.height * kHeightRatio;
+  const float padX = dialog.width * kPadXRatio;
+  const float y = dialog.y + dialog.height - buttonHeight - (dialog.height * kBottomMarginRatio);
+  
+  return {dialog.x + padX, y, dialog.width - 2.0f * padX, buttonHeight};
 }
 
 Rectangle ChessView::getPromotionDialogRect() const {
@@ -424,6 +447,8 @@ Rectangle ChessView::getBoardSquareRect(Position boardPos) const {
                               boardToDisplayIndex(boardPos.col));
 }
 
+int ChessView::positionKey(Position pos) { return pos.row * 8 + pos.col; }
+
 float ChessView::clamp01(float value) {
   if (value < 0.0f) {
     return 0.0f;
@@ -432,6 +457,78 @@ float ChessView::clamp01(float value) {
     return 1.0f;
   }
   return value;
+}
+
+const CastlingTween *ChessView::getActiveCastlingTween() {
+  if (!castlingTween_.has_value()) {
+    return nullptr;
+  }
+
+  CastlingTween &tween = castlingTween_.value();
+  const double elapsed = GetTime() - castlingTweenStartTime_;
+  tween.progress = static_cast<float>(elapsed / castlingTweenDurationSeconds_);
+  if (tween.progress >= 1.0f) {
+    castlingTween_.reset();
+    return nullptr;
+  }
+  if (tween.progress < 0.0f) {
+    tween.progress = 0.0f;
+  }
+  return &tween;
+}
+
+const Position *ChessView::getActiveInvalidHighlightSquare() {
+  if (!invalidHighlightSquare_.has_value()) {
+    return nullptr;
+  }
+
+  const double elapsed = GetTime() - invalidHighlightStartTime_;
+  if (elapsed > invalidHighlightDurationSeconds_) {
+    invalidHighlightSquare_.reset();
+    return nullptr;
+  }
+
+  return &invalidHighlightSquare_.value();
+}
+
+const CaptureEffect *ChessView::getActiveCaptureCounterPopup(
+    CaptureEffect &popupOut) {
+  if (!captureCounterPopupSquare_.has_value() || captureCounterPopupCount_ < 2) {
+    return nullptr;
+  }
+
+  const double elapsed = GetTime() - captureCounterPopupStartTime_;
+  const float progress =
+      static_cast<float>(elapsed / captureCounterPopupDurationSeconds_);
+  if (progress >= 1.0f) {
+    captureCounterPopupSquare_.reset();
+    captureCounterPopupCount_ = 0;
+    return nullptr;
+  }
+
+  popupOut.pos = captureCounterPopupSquare_.value();
+  popupOut.captureCount = captureCounterPopupCount_;
+  popupOut.progress = (progress < 0.0f) ? 0.0f : progress;
+  return &popupOut;
+}
+
+std::vector<CaptureEffect> ChessView::collectBurningPieces(const Board &board) const {
+  std::vector<CaptureEffect> burningPieces;
+  for (const auto &[key, captureCount] : pieceCaptureCounts_) {
+    if (captureCount < 2) {
+      continue;
+    }
+    const Position pos{key / 8, key % 8};
+    if (board.getPieceAt(pos) != nullptr) {
+      burningPieces.push_back({pos, captureCount});
+    }
+  }
+  return burningPieces;
+}
+
+bool ChessView::shouldShowSaveMessage() const {
+  const double saveElapsed = GetTime() - saveMessageStartTime_;
+  return saveElapsed < saveMessageDurationSeconds_;
 }
 
 bool ChessView::isSettingsButtonClicked(float x, float y) const {
@@ -501,6 +598,12 @@ bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
   const Rectangle closeButton = getWindowSizeCloseButtonRect();
   return x >= closeButton.x && x <= closeButton.x + closeButton.width &&
          y >= closeButton.y && y <= closeButton.y + closeButton.height;
+}
+
+bool ChessView::isExitToMenuButtonClicked(float x, float y) const {
+  const Rectangle btn = getExitToMenuButtonRect();
+  return x >= btn.x && x <= btn.x + btn.width &&
+         y >= btn.y && y <= btn.y + btn.height;
 }
 
 bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
@@ -1085,6 +1188,7 @@ void ChessView::drawRightPanel(const Board &board) {
   const bool undoHovered = CheckCollisionPointRec(mousePos, undoButton);
 
   const float uiScale = getUiScale();
+  
   const auto drawRoundedIconButton = [uiScale](Rectangle buttonRect, bool hovered) {
     if (hovered) {
       const float boost = ui::IconButtons::kHoverBoost * uiScale;
@@ -1408,7 +1512,7 @@ void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
                                 ui::Dialog::kRoundSegments,
                                 ui::Dialog::kBorderWidth, ui::Dialog::kBorder);
 
-    const char *titleText = "Window size";
+    const char *titleText = "Settings";
     const int titleWidth = MeasureText(titleText, titleFontSize);
     DrawText(
         titleText,
@@ -1443,6 +1547,25 @@ void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
                                0.5f),
           optionFontSize, ui::Dialog::kTextPrimary);
     }
+
+    const Rectangle exitBtn = getExitToMenuButtonRect();
+    const bool exitHovered = CheckCollisionPointRec(mousePos, exitBtn);
+    DrawRectangleRounded(exitBtn, ui::OptionButton::kRoundness,
+                         ui::OptionButton::kSegments,
+                         exitHovered ? ui::OptionButton::kFillHover
+                                     : ui::OptionButton::kFill);
+    DrawRectangleRoundedLinesEx(exitBtn, ui::OptionButton::kRoundness,
+                                ui::OptionButton::kSegments,
+                                ui::OptionButton::kBorderWidth,
+                                exitHovered ? ui::OptionButton::kBorderHover
+                                        : ui::OptionButton::kBorder);
+    const char *exitText = "Return to Main Menu";
+    const int exitLabelWidth = MeasureText(exitText, optionFontSize);
+    DrawText(
+        exitText,
+        static_cast<int>(exitBtn.x + (exitBtn.width - static_cast<float>(exitLabelWidth)) * 0.5f),
+        static_cast<int>(exitBtn.y + (exitBtn.height - static_cast<float>(optionFontSize)) * 0.5f),
+        optionFontSize, ui::Dialog::kTextPrimary);
 
     const bool closeHovered = CheckCollisionPointRec(mousePos, closeButton);
     DrawRectangleRounded(closeButton, ui::ActionButton::kRoundness,
@@ -1517,24 +1640,117 @@ void ChessView::update(const GameEvent &event) {
   (void)event;
 }
 
+void ChessView::triggerCastlingTween(ChessColor color, Position kingFrom,
+                                     Position kingTo, Position rookFrom,
+                                     Position rookTo) {
+  CastlingTween tween;
+  tween.color = color;
+  tween.kingFrom = kingFrom;
+  tween.kingTo = kingTo;
+  tween.rookFrom = rookFrom;
+  tween.rookTo = rookTo;
+  tween.progress = 0.0f;
+  castlingTween_ = tween;
+  castlingTweenStartTime_ = GetTime();
+}
+
+void ChessView::triggerInvalidHighlight(Position square) {
+  invalidHighlightSquare_ = square;
+  invalidHighlightStartTime_ = GetTime();
+}
+
+void ChessView::onMoveApplied(const Move &move, bool wasCapture) {
+  const int fromKey = positionKey(move.from);
+  const int toKey = positionKey(move.to);
+
+  int movingPieceCaptureCount = 0;
+  const auto fromIt = pieceCaptureCounts_.find(fromKey);
+  if (fromIt != pieceCaptureCounts_.end()) {
+    movingPieceCaptureCount = fromIt->second;
+    pieceCaptureCounts_.erase(fromIt);
+  }
+
+  if (wasCapture) {
+    movingPieceCaptureCount += 1;
+  }
+  pieceCaptureCounts_[toKey] = movingPieceCaptureCount;
+
+  if (move.isCastling) {
+    const int rookFromCol = (move.to.col == 6) ? 7 : 0;
+    const int rookToCol = (move.to.col == 6) ? 5 : 3;
+    const Position rookFrom{move.from.row, rookFromCol};
+    const Position rookTo{move.from.row, rookToCol};
+
+    const int rookFromKey = positionKey(rookFrom);
+    const int rookToKey = positionKey(rookTo);
+
+    int rookCaptureCount = 0;
+    const auto rookIt = pieceCaptureCounts_.find(rookFromKey);
+    if (rookIt != pieceCaptureCounts_.end()) {
+      rookCaptureCount = rookIt->second;
+      pieceCaptureCounts_.erase(rookIt);
+    }
+    pieceCaptureCounts_[rookToKey] = rookCaptureCount;
+  }
+
+  if (wasCapture && movingPieceCaptureCount >= 2) {
+    int effectiveCaptureCount = movingPieceCaptureCount;
+    if (effectiveCaptureCount > 5) {
+      effectiveCaptureCount = 5;
+    }
+    captureCounterPopupSquare_ = move.to;
+    captureCounterPopupCount_ = movingPieceCaptureCount;
+    captureCounterPopupDurationSeconds_ =
+        ui::Animation::kCapturePopupDurationBaseFromMove +
+        ui::Animation::kCapturePopupDurationPerExtraCapture *
+            static_cast<float>(effectiveCaptureCount -
+                               ui::CapturePopup::kStartCaptureCount);
+    captureCounterPopupStartTime_ = GetTime();
+  }
+}
+
+void ChessView::clearCaptureEffects() {
+  pieceCaptureCounts_.clear();
+  captureCounterPopupSquare_.reset();
+  captureCounterPopupCount_ = 0;
+}
+
+void ChessView::triggerSaveMessage() { saveMessageStartTime_ = GetTime(); }
+
+void ChessView::resetVisualEffects() {
+  castlingTween_.reset();
+  invalidHighlightSquare_.reset();
+  clearCaptureEffects();
+}
+
 void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                           const std::vector<Move> &legalMoves,
                           bool showRestartConfirm, bool showWindowSizeDialog,
                           GameState gameState, const ChessColor *winnerColor,
-                          const CastlingTween *castlingTween,
                           const DragPreview *dragPreview,
                           const ChessColor *promotionColor,
-                          const Position *invalidHighlightSquare,
-                          const std::vector<CaptureEffect> &burningPieces,
-                          const CaptureEffect *captureCounterPopup) {
-  BeginDrawing();
-  ClearBackground({0, 0, 0, 255});
+                          bool showSaveMessage) {
+  const CastlingTween *castlingTween = getActiveCastlingTween();
+  const Position *invalidHighlightSquare = getActiveInvalidHighlightSquare();
+  const std::vector<CaptureEffect> burningPieces = collectBurningPieces(board);
+  CaptureEffect captureCounterPopupValue;
+  const CaptureEffect *captureCounterPopup =
+      getActiveCaptureCounterPopup(captureCounterPopupValue);
 
-  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween, dragPreview,
-                  invalidHighlightSquare, burningPieces, captureCounterPopup);
+  ClearBackground({0, 0, 0, 255});
+  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween,
+                  dragPreview, invalidHighlightSquare, burningPieces,
+                  captureCounterPopup);
   drawRightPanel(board);
   drawDialogsAndOverlays(showRestartConfirm, showWindowSizeDialog, gameState,
                          winnerColor, promotionColor);
 
-  EndDrawing();
+  if (showSaveMessage && shouldShowSaveMessage()) {
+    const char *txt = "Game saved to save.bin";
+    DrawRectangleRec({static_cast<float>(GetScreenWidth() / 2 - 160),
+                      static_cast<float>(GetScreenHeight() - 80), 320.0f, 40.0f},
+                     {20, 20, 20, 180});
+    DrawText(txt, GetScreenWidth() / 2 - MeasureText(txt, 18) / 2,
+             GetScreenHeight() - 72, 18, RAYWHITE);
+  }
 }

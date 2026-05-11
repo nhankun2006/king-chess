@@ -3,7 +3,7 @@
 
 #include <vector>
 
-#include "Game.h"
+#include "chess/model/Game.h"
 
 class BotAI {
 private:

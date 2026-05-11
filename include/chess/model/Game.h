@@ -1,10 +1,10 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include "Types.h"
-#include "Move.h"
-#include "Board.h"
-#include "Observer.h"
+#include "chess/model/Types.h"
+#include "chess/model/Move.h"
+#include "chess/model/Board.h"
+#include "chess/model/Observer.h"
 #include <vector>
 
 class Game {

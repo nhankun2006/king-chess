@@ -1,8 +1,8 @@
 #ifndef PIECE_H
 #define PIECE_H
 
-#include "Types.h"
-#include "Move.h"
+#include "chess/model/Types.h"
+#include "chess/model/Move.h"
 #include <memory>
 #include <vector>
 

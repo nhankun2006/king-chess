@@ -33,8 +33,8 @@ constexpr float kPanelMinWidth = 180.0f;
 constexpr float kBoardMinSize = 240.0f;
 
 constexpr float kUiScaleRefBoard = 512.0f;
-constexpr float kUiScaleMin = 0.85f;
-constexpr float kUiScaleMax = 1.35f;
+constexpr float kUiScaleMin = 0.5f;
+constexpr float kUiScaleMax = 5.0f;
 
 constexpr float kScreenMarginRatio = 0.08f;
 constexpr float kScreenMarginMin = 28.0f;
@@ -82,6 +82,10 @@ inline Metrics ComputeMetrics(int screenWidth, int screenHeight) {
   if (boardSize > m.screenHeight) {
     boardSize = m.screenHeight;
   }
+  
+  // Refit panelWidth to consume the entire remaining space so there is no black border
+  panelWidth = m.screenWidth - boardSize;
+  
   if (boardSize < LayoutTuning::kBoardMinSize) {
     boardSize = (m.screenWidth < m.screenHeight) ? m.screenWidth : m.screenHeight;
     panelWidth = m.screenWidth - boardSize;
@@ -123,17 +127,17 @@ inline Rectangle CenteredDialogRect(const Metrics &m, float widthRatio,
 }
 
 inline float IconButtonSize(const Metrics &m) {
-  constexpr float kRatio = 44.0f / 512.0f;
-  return m.boardRect.width * kRatio;
+  constexpr float kBaseSize = 44.0f;
+  return kBaseSize * m.uiScale;
 }
 
 inline float IconButtonGap(const Metrics &m) {
-  constexpr float kRatio = 12.0f / 512.0f;
-  return m.boardRect.width * kRatio;
+  constexpr float kBaseGap = 12.0f;
+  return kBaseGap * m.uiScale;
 }
 
 inline float IconButtonStartY(const Metrics &m) {
-  constexpr float kRatio = 236.0f / 512.0f;
+  constexpr float kRatio = 206.0f / 512.0f; // Adjusted up to be centered between the two captured areas
   return m.boardRect.height * kRatio;
 }
 
@@ -145,7 +149,7 @@ inline Rectangle RestartDialogRect(const Metrics &m) {
 
 inline Rectangle WindowSizeDialogRect(const Metrics &m) {
   constexpr float kWidthRatio = 340.0f / 700.0f;
-  constexpr float kHeightRatio = 270.0f / 512.0f;
+  constexpr float kHeightRatio = 340.0f / 512.0f; // Expanded to fit exit button
   return CenteredDialogRect(m, kWidthRatio, kHeightRatio);
 }
 
@@ -227,7 +231,7 @@ constexpr float kHoverBoost = 1.5f;
 constexpr float kRoundness = 0.35f;
 constexpr int kSegments = 10;
 constexpr float kBorderWidth = 2.0f;
-constexpr float kIconSize = 24.0f;
+constexpr float kIconSize = 28.0f;
 constexpr float kTooltipFont = 14.0f;
 constexpr float kTooltipYOffset = 20.0f;
 
@@ -235,12 +239,12 @@ constexpr Color kButtonFill = {48, 58, 78, 255};
 constexpr Color kButtonFillHover = {72, 86, 112, 255};
 constexpr Color kButtonBorder = {90, 105, 130, 255};
 constexpr Color kButtonBorderHover = {132, 152, 190, 255};
-constexpr Color kTooltipText = {210, 220, 235, 255};
+constexpr Color kTooltipText = {253, 249, 0, 255}; // Yellow text on hover
 
 constexpr float kFallbackRotateLabelX = 14.0f;
 constexpr float kFallbackRotateLabelY = 9.0f;
-constexpr float kFallbackSettingsOuterRadius = 9.0f;
-constexpr float kFallbackSettingsInnerRadius = 4.5f;
+constexpr float kFallbackSettingsOuterRadius = 11.0f;
+constexpr float kFallbackSettingsInnerRadius = 5.5f;
 
 constexpr float kRestartRingInner = 8.0f;
 constexpr float kRestartRingOuter = 12.0f;
