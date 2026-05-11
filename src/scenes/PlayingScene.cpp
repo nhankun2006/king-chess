@@ -1,5 +1,6 @@
 #include "scenes/PlayingScene.h"
 #include "ChessSound.h"
+#include "scenes/MenuModel.h"
 #include <memory>
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
@@ -8,7 +9,8 @@ PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
 PlayingScene::~PlayingScene() {
     // Ensure game is saved when the playing scene is destroyed (exit or scene switch)
     if (game_ != nullptr) {
-        game_->saveGame("save.bin");
+        std::string saveFile = (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
+        game_->saveGame(saveFile);
     }
     delete controller_;
     delete view_;
@@ -18,7 +20,10 @@ PlayingScene::~PlayingScene() {
 void PlayingScene::update(SceneManager* manager) {
     // If not started, initialize game and run the blocking controller loop
     if (game_ == nullptr) {
+        std::string saveFile = (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
+        
         game_ = new Game();
+        game_->setTimeControl(g_targetTimeControl);
         view_ = new ChessView();
         ChessSound* sound = new ChessSound();
         sound->loadSounds();
@@ -32,15 +37,16 @@ void PlayingScene::update(SceneManager* manager) {
             return;
         }
 
-        controller_ = new ChessController(*game_, *view_);
+        controller_ = new ChessController(*game_, *view_, saveFile);
 
         // If load flag set, attempt to load save (Game::loadFromFile assumed)
         if (isLoaded_) {
             // Use Game's load mechanism
-            bool ok = game_->loadGame("save.bin");
+            bool ok = game_->loadGame(saveFile);
             if (!ok) {
                 // Show a brief error message and return to main menu
-                const char* msg = "Failed to load save.bin - returning to menu";
+                std::string msgStr = "Failed to load " + saveFile + " - returning to menu";
+                const char* msg = msgStr.c_str();
                 const double start = GetTime();
                 while (GetTime() - start < 1.5 && !WindowShouldClose()) {
                     BeginDrawing();

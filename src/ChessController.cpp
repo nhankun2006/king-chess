@@ -162,7 +162,7 @@ void ChessController::run() {
     const GameState gameState = game_->getState();
     ChessColor winnerColorVal = ChessColor::White;
     ChessColor *winnerColor = nullptr;
-    if (gameState == GameState::Checkmate) {
+    if (gameState == GameState::Checkmate || gameState == GameState::Timeout) {
       winnerColorVal = oppositeColor(game_->getCurrentTurn());
       winnerColor = &winnerColorVal;
     }
@@ -176,11 +176,11 @@ void ChessController::run() {
     view_->drawBoard(game_->getBoard(), selectedSquare_, selectedLegalMoves_,
                      restartConfirmOpen_, windowSizeDialogOpen_, gameState,
                      winnerColor, activeTweenPtr, dragPreview, promotionColor,
-                     invalidHighlight, burningPieces, captureCounterPopup);
-  };
+                       invalidHighlight, burningPieces, captureCounterPopup,
+                       game_->getWhiteTimeLeft(), game_->getBlackTimeLeft(),
+                       game_->getCurrentTurn());    };
 
-  auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {
-    Position warningSquare = {-1, -1};
+    auto triggerInvalidMoveWarning = [&](const Position *fallbackSquare) {    Position warningSquare = {-1, -1};
     const ChessColor sideToMove = game_->getCurrentTurn();
     const Board &board = game_->getBoard();
 
@@ -208,9 +208,12 @@ void ChessController::run() {
   };
 
   while (!WindowShouldClose()) {
-    // Quick-save hotkey: press 'S' to save current game to save.bin
+    const float dt = GetFrameTime();
+    game_->tickTimer(dt);
+
+    // Quick-save hotkey: press 'S' to save current game
     if (IsKeyPressed(KEY_S)) {
-      const bool ok = game_->saveGame("save.bin");
+      const bool ok = game_->saveGame(saveFileName_);
       saveMessageStartTime_ = GetTime();
     }
 
@@ -218,7 +221,7 @@ void ChessController::run() {
     if (autosavePeriodic_) {
       const double now = GetTime();
       if (now - lastAutosaveTime_ >= autosaveIntervalSeconds_) {
-        game_->saveGame("save.bin");
+        game_->saveGame(saveFileName_);
         saveMessageStartTime_ = now;
         lastAutosaveTime_ = now;
       }
@@ -475,18 +478,19 @@ void ChessController::run() {
 
     // Autosave after successful moves (if enabled)
     if (movedThisFrame && autosaveOnMove_) {
-      game_->saveGame("save.bin");
+      game_->saveGame(saveFileName_);
       saveMessageStartTime_ = GetTime();
     }
 
     // Draw quick-save / autosave feedback if active
     const double saveElapsed = GetTime() - saveMessageStartTime_;
     if (saveElapsed < saveMessageDurationSeconds_) {
-      const char *txt = "Game saved to save.bin";
+      std::string txtStr = "Game saved to " + saveFileName_;
+      const char *txt = txtStr.c_str();
       DrawRectangleRec({(float)(GetScreenWidth()/2 - 160), (float)(GetScreenHeight() - 80), 320, 40}, {20,20,20,180});
       DrawText(txt, GetScreenWidth()/2 - MeasureText(txt, 18)/2, GetScreenHeight() - 72, 18, RAYWHITE);
     }
   }
   // Save on exit as a final backup
-  game_->saveGame("save.bin");
+  game_->saveGame(saveFileName_);
 }

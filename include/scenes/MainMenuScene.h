@@ -11,7 +11,7 @@
 
 // Simple enums used by menu and playing scenes
 enum class PlayMode { PvP, PvE };
-enum class MenuState { MAIN, SELECT_MODE };
+enum class MenuState { HOME, PLAY_SELECT, SELECT_MODE, SELECT_TIMER, SETTINGS, CREDITS };
 
 class MainMenuScene : public Scene {
 private:

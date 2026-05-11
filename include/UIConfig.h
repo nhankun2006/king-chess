@@ -215,12 +215,12 @@ constexpr float kIconGapCompact = 6.0f;
 constexpr float kIconGapRegular = 7.0f;
 constexpr float kGridInsetX = 10.0f;
 constexpr float kGridInsetWidth = 20.0f;
-constexpr float kCapturedY = 46.0f;
+  constexpr float kCapturedY = 16.0f;
 
-constexpr float kEmptyX = 14.0f;
-constexpr float kEmptyFont = 32.0f;
-constexpr int kEmptyHeight = 86;
-constexpr int kSectionTopPadding = 52;
+  constexpr float kEmptyX = 14.0f;
+  constexpr float kEmptyFont = 32.0f;
+  constexpr int kEmptyHeight = 56;
+  constexpr int kSectionTopPadding = 22;
 } // namespace RightPanel
 
 namespace IconButtons {

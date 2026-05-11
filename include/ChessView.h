@@ -85,7 +85,7 @@ private:
                        const Position *invalidHighlightSquare,
                        const std::vector<CaptureEffect> &burningPieces,
                        const CaptureEffect *captureCounterPopup);
-  void drawRightPanel(const Board &board);
+  void drawRightPanel(const Board &board, float whiteTimeLeft = 0.0f, float blackTimeLeft = 0.0f, ChessColor currentTurn = ChessColor::White);
   void drawDialogsAndOverlays(bool showRestartConfirm,
                               bool showWindowSizeDialog, GameState gameState,
                               const ChessColor *winnerColor,
@@ -129,7 +129,10 @@ public:
                  const ChessColor *promotionColor = nullptr,
                  const Position *invalidHighlightSquare = nullptr,
                  const std::vector<CaptureEffect> &burningPieces = {},
-                 const CaptureEffect *captureCounterPopup = nullptr);
+                 const CaptureEffect *captureCounterPopup = nullptr,
+                 float whiteTimeLeft = 0.0f,
+                 float blackTimeLeft = 0.0f,
+                 ChessColor currentTurn = ChessColor::White);
 
 };
 

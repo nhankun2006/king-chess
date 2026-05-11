@@ -43,11 +43,13 @@ private:
   bool autosavePeriodic_ = false;
   double lastAutosaveTime_ = 0.0;
   float autosaveIntervalSeconds_ = 30.0f; // seconds
+  std::string saveFileName_ = "save.bin";
   void updateSelection(Position pos);
   void clearSelection();
 
 public:
-  ChessController(Game &game, ChessView &view) : game_(&game), view_(&view) {}
+  ChessController(Game &game, ChessView &view, const std::string& saveFileName = "save.bin") 
+    : game_(&game), view_(&view), saveFileName_(saveFileName) {}
   ~ChessController();
 
   void run();

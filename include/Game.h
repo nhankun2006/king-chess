@@ -5,6 +5,7 @@
 #include "Move.h"
 #include "Board.h"
 #include "Observer.h"
+#include <map>
 #include <vector>
 
 class Game {
@@ -13,11 +14,18 @@ private:
   ChessColor currentTurn_ = ChessColor::White;
   GameState state_ = GameState::Playing;
   std::vector<Move> moveHistory_;
+  std::map<PieceType, int> capturedWhitePieces_;
+  std::map<PieceType, int> capturedBlackPieces_;
   std::vector<Observer *> observers_;
 
   // Castling rights: [White kingside, White queenside, Black kingside, Black
   // queenside]
   bool castlingRights_[4] = {true, true, true, true};
+
+  // Timer variables
+  int timeControlMinutes_ = 5;
+  float whiteTimeLeft_ = 5.0f * 60.0f;
+  float blackTimeLeft_ = 5.0f * 60.0f;
 
   // Internal helpers
   bool wouldBeInCheck(const Move &move, ChessColor color) const;
@@ -33,6 +41,14 @@ public:
   ChessColor getCurrentTurn() const { return currentTurn_; }
   const Board &getBoard() const { return board_; }
   std::vector<Move> getMoveHistory() const { return moveHistory_; }
+
+  const std::map<PieceType, int> &getCapturedWhitePieces() const { return capturedWhitePieces_; }
+  const std::map<PieceType, int> &getCapturedBlackPieces() const { return capturedBlackPieces_; }
+
+  void setTimeControl(int minutes);
+  float getWhiteTimeLeft() const { return whiteTimeLeft_; }
+  float getBlackTimeLeft() const { return blackTimeLeft_; }
+  void tickTimer(float dt);
 
   // Castling rights access
   bool canCastleKingside(ChessColor color) const;

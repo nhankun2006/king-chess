@@ -17,8 +17,10 @@ std::unique_ptr<Scene> App::createScene(SceneType type) {
             return std::make_unique<PlayingScene>(PlayMode::PvP, false);
         case SceneType::PLAYING_PVE:
             return std::make_unique<PlayingScene>(PlayMode::PvE, false);
-        case SceneType::PLAYING_LOADED:
+        case SceneType::PLAYING_LOADED_PVP:
             return std::make_unique<PlayingScene>(PlayMode::PvP, true);
+        case SceneType::PLAYING_LOADED_PVE:
+            return std::make_unique<PlayingScene>(PlayMode::PvE, true);
         default:
             return std::make_unique<MainMenuScene>();
     }
