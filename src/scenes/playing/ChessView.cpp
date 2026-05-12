@@ -1755,17 +1755,17 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                           const std::vector<Move> &legalMoves,
                           bool showRestartConfirm, bool showWindowSizeDialog,
                           GameState gameState, const ChessColor *winnerColor,
-                          const CastlingTween *castlingTween,
                           const DragPreview *dragPreview,
                           const ChessColor *promotionColor,
-                          const Position *invalidHighlightSquare,
-                          const std::vector<CaptureEffect> &burningPieces,
-                          const CaptureEffect *captureCounterPopup,
                           float whiteTimeLeft, float blackTimeLeft,
                           ChessColor currentTurn) {
   ClearBackground({0, 0, 0, 255});
-  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween, dragPreview,
-                  invalidHighlightSquare, burningPieces, captureCounterPopup);
+  
+  CaptureEffect capturePopupValue;
+  const CaptureEffect *captureCounterPopup = getActiveCaptureCounterPopup(capturePopupValue);
+
+  drawBoardLayers(board, selectedSquare, legalMoves, getActiveCastlingTween(), dragPreview,
+                  getActiveInvalidHighlightSquare(), collectBurningPieces(board), captureCounterPopup);
   drawRightPanel(board, whiteTimeLeft, blackTimeLeft, currentTurn);
   drawDialogsAndOverlays(showRestartConfirm, showWindowSizeDialog, gameState,
                          winnerColor, promotionColor);

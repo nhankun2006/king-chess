@@ -301,19 +301,10 @@ void ChessController::render() {
     promotionColor = &promotionPromptColor_;
   }
 
-  const CastlingTween *castlingTween = view_->getActiveCastlingTween();
-  const Position *invalidHighlight = view_->getActiveInvalidHighlightSquare();
-  const std::vector<CaptureEffect> burningPieces =
-      view_->collectBurningPieces(game_->getBoard());
-  CaptureEffect capturePopupValue;
-  const CaptureEffect *capturePopup =
-      view_->getActiveCaptureCounterPopup(capturePopupValue);
-
   view_->drawBoard(game_->getBoard(),
                    selectedSquare_.has_value() ? &selectedSquare_.value() : nullptr,
                    selectedLegalMoves_, restartConfirmOpen_, windowSizeDialogOpen_,
-                   gameState, winnerColor, castlingTween, dragPreview, promotionColor,
-                   invalidHighlight, burningPieces, capturePopup,
+                   gameState, winnerColor, dragPreview, promotionColor,
                    game_->getWhiteTimeLeft(), game_->getBlackTimeLeft(),
                    game_->getCurrentTurn());
 }

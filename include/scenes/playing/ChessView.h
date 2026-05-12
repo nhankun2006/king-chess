@@ -112,11 +112,12 @@ private:
   int getCapturedSectionHeight(int sectionWidth,
                                const std::map<PieceType, int> &captured) const;
 
-public:
   const CastlingTween *getActiveCastlingTween();
   const Position *getActiveInvalidHighlightSquare();
   const CaptureEffect *getActiveCaptureCounterPopup(CaptureEffect &popupOut);
   std::vector<CaptureEffect> collectBurningPieces(const Board &board) const;
+
+public:
   ChessView();
   ~ChessView();
 
@@ -151,12 +152,8 @@ public:
                  bool showWindowSizeDialog = false,
                  GameState gameState = GameState::Playing,
                  const ChessColor *winnerColor = nullptr,
-                 const CastlingTween *castlingTween = nullptr,
                  const DragPreview *dragPreview = nullptr,
                  const ChessColor *promotionColor = nullptr,
-                 const Position *invalidHighlightSquare = nullptr,
-                 const std::vector<CaptureEffect> &burningPieces = {},
-                 const CaptureEffect *captureCounterPopup = nullptr,
                  float whiteTimeLeft = 0.0f,
                  float blackTimeLeft = 0.0f,
                  ChessColor currentTurn = ChessColor::White);
