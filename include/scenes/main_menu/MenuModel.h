@@ -11,6 +11,9 @@ public:
 
     PlayMode selectedMode;
     MenuState state;
+    int selectedTimer = 5;
 };
+
+extern int g_targetTimeControl;
 
 #endif // MENUMODEL_H

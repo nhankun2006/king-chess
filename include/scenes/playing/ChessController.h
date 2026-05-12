@@ -3,10 +3,12 @@
 
 #include <optional>
 #include <memory>
-#include <vector>
 
 #include "chess/players/IPlayerAgent.h"
-#include "scenes/playing/ChessView.h"
+#include <string>
+#include <vector>
+
+#include "ChessView.h"
 #include "chess/model/Game.h"
 
 class IdleInteractionState;
@@ -22,7 +24,6 @@ public:
   struct RenderState {
     bool showRestartConfirm = false;
     bool showWindowSizeDialog = false;
-    bool showSaveMessage = true;
     std::optional<DragPreview> dragPreview;
     std::optional<ChessColor> promotionColor;
   };
@@ -62,6 +63,7 @@ private:
   bool autosavePeriodic_ = false;
   double lastAutosaveTime_ = 0.0;
   float autosaveIntervalSeconds_ = 30.0f;
+  std::string saveFileName_ = "save.bin";
 
   void updateSelection(Position pos);
   void clearSelection();
@@ -78,7 +80,8 @@ private:
 public:
   ChessController(Game &game, ChessView &view,
                   std::unique_ptr<IPlayerAgent> whitePlayer,
-                  std::unique_ptr<IPlayerAgent> blackPlayer);
+                  std::unique_ptr<IPlayerAgent> blackPlayer,
+                  const std::string &saveFileName = "save.bin");
   ~ChessController();
 
   bool processInput();

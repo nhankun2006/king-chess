@@ -3,15 +3,16 @@
 
 #include "core/Scene.h"
 #include "core/SceneManager.h"
-#include "scenes/PlayMode.h"
 #include <raylib.h>
 #include <memory>
-#include "scenes/main_menu/MenuModel.h"
-#include "scenes/main_menu/MenuView.h"
-#include "scenes/main_menu/MenuController.h"
+#include "MenuModel.h"
+#include "MenuView.h"
+#include "MenuController.h"
 
-// Simple enum used by main menu scene
-enum class MenuState { MAIN, SELECT_MODE };
+#include "scenes/PlayMode.h"
+
+// Simple enums used by menu and playing scenes
+enum class MenuState { HOME, PLAY_SELECT, SELECT_MODE, SELECT_TIMER, SETTINGS, CREDITS };
 
 class MainMenuScene : public Scene {
 private:

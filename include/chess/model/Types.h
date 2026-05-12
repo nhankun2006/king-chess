@@ -5,7 +5,7 @@ enum class ChessColor { White, Black };
 
 enum class PieceType { None, Pawn, Knight, Bishop, Rook, Queen, King };
 
-enum class GameState { Playing, Check, Checkmate, Stalemate, Draw };
+enum class GameState { Playing, Check, Checkmate, Stalemate, Draw, Timeout };
 
 struct Position {
   int row; // 0-7 (rank 1-8, white at bottom: row 0 = rank 1)

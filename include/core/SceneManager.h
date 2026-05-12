@@ -5,7 +5,8 @@ enum class SceneType {
     MAIN_MENU,
     PLAYING_PVP,
     PLAYING_PVE,
-    PLAYING_LOADED
+    PLAYING_LOADED_PVP,
+    PLAYING_LOADED_PVE
 };
 
 class SceneManager {

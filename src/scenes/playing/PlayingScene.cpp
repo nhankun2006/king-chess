@@ -1,19 +1,26 @@
 #include "scenes/playing/PlayingScene.h"
 
 #include "chess/players/PlayerFactory.h"
+#include "scenes/main_menu/MenuModel.h"
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
     : mode_(mode), shouldLoadSave_(loadSave) {}
 
 PlayingScene::~PlayingScene() {
   if (game_ != nullptr) {
-    game_->saveGame("save.bin");
+    const std::string saveFile =
+        (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
+    game_->saveGame(saveFile);
   }
 }
 
 void PlayingScene::update(SceneManager *manager) {
   if (!initialized_) {
+    const std::string saveFile =
+        (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
+
     game_ = std::make_unique<Game>();
+    game_->setTimeControl(g_targetTimeControl);
     view_ = std::make_unique<ChessView>();
     sound_ = std::make_unique<ChessSound>();
     sound_->loadSounds();
@@ -29,11 +36,12 @@ void PlayingScene::update(SceneManager *manager) {
 
     auto players = PlayerFactory::create(mode_);
     controller_ = std::make_unique<ChessController>(
-        *game_, *view_, std::move(players.white), std::move(players.black));
+        *game_, *view_, std::move(players.white), std::move(players.black), saveFile);
 
-    if (shouldLoadSave_ && !game_->loadGame("save.bin")) {
+    if (shouldLoadSave_ && !game_->loadGame(saveFile)) {
       loadFailed_ = true;
       loadFailStartTime_ = GetTime();
+      loadFailMessage_ = "Failed to load " + saveFile + " - returning to menu";
     }
 
     initialized_ = true;
@@ -62,8 +70,8 @@ void PlayingScene::render() {
 
   if (loadFailed_) {
     ClearBackground({30, 30, 30, 255});
-    DrawText(kLoadFailMessage_,
-             GetScreenWidth() / 2 - MeasureText(kLoadFailMessage_, 20) / 2,
+    DrawText(loadFailMessage_.c_str(),
+             GetScreenWidth() / 2 - MeasureText(loadFailMessage_.c_str(), 20) / 2,
              GetScreenHeight() / 2 - 10, 20, RAYWHITE);
     return;
   }
@@ -75,7 +83,7 @@ void PlayingScene::render() {
   ChessColor winnerColorVal = ChessColor::White;
   ChessColor *winnerColor = nullptr;
   const GameState gameState = game_->getState();
-  if (gameState == GameState::Checkmate) {
+  if (gameState == GameState::Checkmate || gameState == GameState::Timeout) {
     winnerColorVal = oppositeColor(game_->getCurrentTurn());
     winnerColor = &winnerColorVal;
   }
@@ -96,5 +104,7 @@ void PlayingScene::render() {
   view_->drawBoard(game_->getBoard(), selectedSquare, controller_->getLegalMoves(),
                    renderState.showRestartConfirm,
                    renderState.showWindowSizeDialog, gameState, winnerColor,
-                   dragPreview, promotionColor, renderState.showSaveMessage);
+                   dragPreview, promotionColor,
+                   game_->getWhiteTimeLeft(), game_->getBlackTimeLeft(),
+                   game_->getCurrentTurn());
 }

@@ -4,4 +4,6 @@
 #include "scenes/main_menu/MainMenuScene.h"
 
 MenuModel::MenuModel()
-	: selectedMode(PlayMode::PvP), state(MenuState::MAIN) {}
+	: selectedMode(PlayMode::PvP), state(MenuState::HOME) {}
+
+int g_targetTimeControl = 5;

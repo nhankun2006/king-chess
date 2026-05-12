@@ -10,12 +10,14 @@
 // Construction / Destruction
 ChessController::ChessController(Game &game, ChessView &view,
                                  std::unique_ptr<IPlayerAgent> whitePlayer,
-                                 std::unique_ptr<IPlayerAgent> blackPlayer)
+                                 std::unique_ptr<IPlayerAgent> blackPlayer,
+                                 const std::string &saveFileName)
     : game_(&game),
       view_(&view),
       whitePlayer_(std::move(whitePlayer)),
       blackPlayer_(std::move(blackPlayer)),
-      state_(std::make_unique<IdleInteractionState>()) {}
+      state_(std::make_unique<IdleInteractionState>()),
+      saveFileName_(saveFileName) {}
 
 ChessController::~ChessController() = default;
 
@@ -67,7 +69,7 @@ bool ChessController::applyMove(const Move &move) {
 
   // Autosave on move
   if (autosaveOnMove_) {
-    if (game_->saveGame("save.bin")) {
+    if (game_->saveGame(saveFileName_)) {
       view_->triggerSaveMessage();
     }
   }
@@ -142,9 +144,13 @@ void ChessController::triggerInvalidMoveWarning(
 // ─── Main per-frame entry point ─────────────────────────────────────────────
 
 bool ChessController::processInput() {
-  // Quick-save hotkey (always available)
+  // Tick the game timer
+  const float dt = GetFrameTime();
+  game_->tickTimer(dt);
+
+  // Quick-save hotkey
   if (IsKeyPressed(KEY_S)) {
-    if (game_->saveGame("save.bin")) {
+    if (game_->saveGame(saveFileName_)) {
       view_->triggerSaveMessage();
     }
   }
@@ -153,7 +159,7 @@ bool ChessController::processInput() {
   if (autosavePeriodic_) {
     const double now = GetTime();
     if (now - lastAutosaveTime_ >= autosaveIntervalSeconds_) {
-      if (game_->saveGame("save.bin")) {
+      if (game_->saveGame(saveFileName_)) {
         view_->triggerSaveMessage();
       }
       lastAutosaveTime_ = now;
@@ -173,6 +179,7 @@ bool ChessController::processInput() {
   if (state_) {
     return state_->handleInput(*this);
   }
+
   return false;
 }
 
@@ -189,7 +196,6 @@ ChessController::RenderState ChessController::buildRenderState() const {
   RenderState rs;
   rs.showRestartConfirm = restartConfirmOpen_;
   rs.showWindowSizeDialog = windowSizeDialogOpen_;
-  rs.showSaveMessage = true;
 
   if (isDraggingPiece_ && dragFromSquare_.has_value() &&
       dragPieceType_ != PieceType::None) {
