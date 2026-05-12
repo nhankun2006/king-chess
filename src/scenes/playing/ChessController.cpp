@@ -166,10 +166,9 @@ bool ChessController::processInput() {
   }
 
   // Auto-transition to BotTurnState when it is an automated player's turn
-  if (!botThinking_ && !isInputBlockedByUi() && gameIsPlayable()) {
+  if (state_ && !state_->isBotThinking() && !isInputBlockedByUi() && gameIsPlayable()) {
     const IPlayerAgent *player = currentPlayer();
     if (player != nullptr && player->isAutomated()) {
-      botThinking_ = true;
       setState(std::make_unique<BotTurnState>());
     }
   }

@@ -27,6 +27,9 @@ public:
   
   /// Determines if the current state should block the bot from automatically taking its turn
   virtual bool blocksBotInput() const { return false; }
+
+  /// Determines if the bot is currently thinking
+  virtual bool isBotThinking() const { return false; }
 };
 
 #endif // CHESSCONTROLLERSTATE_H
