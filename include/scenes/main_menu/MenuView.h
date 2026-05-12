@@ -6,10 +6,15 @@
 
 class MenuView {
 public:
-    MenuView() = default;
+    MenuView();
+    ~MenuView();
 
     // Render the menu based on model state
     void render(const MenuModel& model);
+
+private:
+    Texture2D titleImage_;
+    Texture2D bgImage_;
 };
 
 #endif // MENUVIEW_H

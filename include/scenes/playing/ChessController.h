@@ -2,9 +2,10 @@
 #define CHESSCONTROLLER_H
 
 #include <optional>
+#include <string>
 #include <vector>
 
-#include "scenes/playing/ChessView.h"
+#include "ChessView.h"
 #include "chess/model/Game.h"
 
 class ChessController {
@@ -32,6 +33,7 @@ private:
   bool autosavePeriodic_ = false;
   double lastAutosaveTime_ = 0.0;
   float autosaveIntervalSeconds_ = 30.0f;
+  std::string saveFileName_ = "save.bin";
 
   void updateSelection(Position pos);
   void clearSelection();
@@ -39,7 +41,8 @@ private:
   void triggerInvalidMoveWarning(const std::optional<Position> &fallbackSquare);
 
 public:
-  ChessController(Game &game, ChessView &view) : game_(&game), view_(&view) {}
+  ChessController(Game &game, ChessView &view, const std::string &saveFileName = "save.bin")
+      : game_(&game), view_(&view), saveFileName_(saveFileName) {}
   ~ChessController() = default;
 
   bool processInput();

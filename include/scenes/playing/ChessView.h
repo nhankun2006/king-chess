@@ -92,10 +92,6 @@ private:
   Rectangle getBoardSquareRect(Position boardPos) const;
   static int positionKey(Position pos);
   static float clamp01(float value);
-  const CastlingTween *getActiveCastlingTween();
-  const Position *getActiveInvalidHighlightSquare();
-  const CaptureEffect *getActiveCaptureCounterPopup(CaptureEffect &popupOut);
-  std::vector<CaptureEffect> collectBurningPieces(const Board &board) const;
   bool shouldShowSaveMessage() const;
 
   void drawBoardLayers(const Board &board, const Position *selectedSquare,
@@ -105,7 +101,7 @@ private:
                        const Position *invalidHighlightSquare,
                        const std::vector<CaptureEffect> &burningPieces,
                        const CaptureEffect *captureCounterPopup);
-  void drawRightPanel(const Board &board);
+  void drawRightPanel(const Board &board, float whiteTimeLeft = 0.0f, float blackTimeLeft = 0.0f, ChessColor currentTurn = ChessColor::White);
   void drawDialogsAndOverlays(bool showRestartConfirm,
                               bool showWindowSizeDialog, GameState gameState,
                               const ChessColor *winnerColor,
@@ -117,6 +113,10 @@ private:
                                const std::map<PieceType, int> &captured) const;
 
 public:
+  const CastlingTween *getActiveCastlingTween();
+  const Position *getActiveInvalidHighlightSquare();
+  const CaptureEffect *getActiveCaptureCounterPopup(CaptureEffect &popupOut);
+  std::vector<CaptureEffect> collectBurningPieces(const Board &board) const;
   ChessView();
   ~ChessView();
 
@@ -148,12 +148,18 @@ public:
   void drawBoard(const Board &board, const Position *selectedSquare = nullptr,
                  const std::vector<Move> &legalMoves = {},
                  bool showRestartConfirm = false,
-                  bool showWindowSizeDialog = false,
-                  GameState gameState = GameState::Playing,
-                  const ChessColor *winnerColor = nullptr,
-                  const DragPreview *dragPreview = nullptr,
-                  const ChessColor *promotionColor = nullptr,
-                  bool showSaveMessage = false);
+                 bool showWindowSizeDialog = false,
+                 GameState gameState = GameState::Playing,
+                 const ChessColor *winnerColor = nullptr,
+                 const CastlingTween *castlingTween = nullptr,
+                 const DragPreview *dragPreview = nullptr,
+                 const ChessColor *promotionColor = nullptr,
+                 const Position *invalidHighlightSquare = nullptr,
+                 const std::vector<CaptureEffect> &burningPieces = {},
+                 const CaptureEffect *captureCounterPopup = nullptr,
+                 float whiteTimeLeft = 0.0f,
+                 float blackTimeLeft = 0.0f,
+                 ChessColor currentTurn = ChessColor::White);
 
 };
 
