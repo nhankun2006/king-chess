@@ -5,6 +5,7 @@
 #include "chess/model/Move.h"
 #include "chess/model/Board.h"
 #include "chess/model/Observer.h"
+#include <optional>
 #include <map>
 #include <vector>
 
@@ -56,6 +57,11 @@ public:
 
   // Move generation (fully legal — filters out self-check)
   std::vector<Move> getLegalMoves(Position pos) const;
+  std::vector<Move> getLegalMovesBetween(Position from, Position to) const;
+  bool hasPromotionChoices(Position from, Position to) const;
+  std::optional<Move> resolveLegalMove(
+      Position from, Position to,
+      PieceType promotion = PieceType::None) const;
   std::vector<Move> getAllLegalMoves(ChessColor color) const;
 
   // Execute a move; returns false if the move is illegal

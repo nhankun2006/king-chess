@@ -2,16 +2,45 @@
 #define CHESSCONTROLLER_H
 
 #include <optional>
+#include <memory>
+
+#include "chess/players/IPlayerAgent.h"
 #include <string>
 #include <vector>
 
 #include "ChessView.h"
 #include "chess/model/Game.h"
 
+class IdleInteractionState;
+class DraggingInteractionState;
+class PromotionInteractionState;
+class RestartModalInteractionState;
+class WindowModalInteractionState;
+class BotTurnState;
+class ChessControllerState;
+
 class ChessController {
+public:
+  struct RenderState {
+    bool showRestartConfirm = false;
+    bool showWindowSizeDialog = false;
+    std::optional<DragPreview> dragPreview;
+    std::optional<ChessColor> promotionColor;
+  };
+
 private:
+  friend class IdleInteractionState;
+  friend class DraggingInteractionState;
+  friend class PromotionInteractionState;
+  friend class RestartModalInteractionState;
+  friend class WindowModalInteractionState;
+  friend class BotTurnState;
+
   Game *game_ = nullptr;
   ChessView *view_ = nullptr;
+  std::unique_ptr<IPlayerAgent> whitePlayer_;
+  std::unique_ptr<IPlayerAgent> blackPlayer_;
+  std::unique_ptr<ChessControllerState> state_;
 
   std::optional<Position> selectedSquare_;
   std::vector<Move> selectedLegalMoves_;
@@ -26,7 +55,8 @@ private:
 
   bool promotionPromptOpen_ = false;
   ChessColor promotionPromptColor_ = ChessColor::White;
-  std::vector<Move> pendingPromotionMoves_;
+
+  bool botThinking_ = false;
 
   // Autosave settings
   bool autosaveOnMove_ = true;
@@ -39,14 +69,25 @@ private:
   void clearSelection();
   void stopDragging();
   void triggerInvalidMoveWarning(const std::optional<Position> &fallbackSquare);
+  bool applyMove(const Move &move);
+  const IPlayerAgent *currentPlayer() const;
+  bool isInputBlockedByUi() const;
+  bool isHumanVsBotMatch() const;
+  bool undoForCurrentMode();
+  bool gameIsPlayable() const;
+  void setState(std::unique_ptr<ChessControllerState> nextState);
 
 public:
-  ChessController(Game &game, ChessView &view, const std::string &saveFileName = "save.bin")
-      : game_(&game), view_(&view), saveFileName_(saveFileName) {}
-  ~ChessController() = default;
+  ChessController(Game &game, ChessView &view,
+                  std::unique_ptr<IPlayerAgent> whitePlayer,
+                  std::unique_ptr<IPlayerAgent> blackPlayer,
+                  const std::string &saveFileName = "save.bin");
+  ~ChessController();
 
   bool processInput();
-  void render();
+  const std::optional<Position> &getSelectedSquare() const;
+  const std::vector<Move> &getLegalMoves() const;
+  RenderState buildRenderState() const;
 };
 
 #endif // CHESSCONTROLLER_H

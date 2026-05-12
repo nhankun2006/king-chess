@@ -1,5 +1,6 @@
 
 #include "scenes/main_menu/MenuModel.h"
+#include "scenes/PlayMode.h"
 #include "scenes/main_menu/MainMenuScene.h"
 
 MenuModel::MenuModel()

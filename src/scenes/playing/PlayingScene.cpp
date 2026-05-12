@@ -1,5 +1,6 @@
 #include "scenes/playing/PlayingScene.h"
 
+#include "chess/players/PlayerFactory.h"
 #include "scenes/main_menu/MenuModel.h"
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
@@ -33,7 +34,9 @@ void PlayingScene::update(SceneManager *manager) {
       return;
     }
 
-    controller_ = std::make_unique<ChessController>(*game_, *view_, saveFile);
+    auto players = PlayerFactory::create(mode_);
+    controller_ = std::make_unique<ChessController>(
+        *game_, *view_, std::move(players.white), std::move(players.black), saveFile);
 
     if (shouldLoadSave_ && !game_->loadGame(saveFile)) {
       loadFailed_ = true;
@@ -73,7 +76,35 @@ void PlayingScene::render() {
     return;
   }
 
-  if (controller_ != nullptr) {
-    controller_->render();
+  if (controller_ == nullptr || game_ == nullptr || view_ == nullptr) {
+    return;
   }
+
+  ChessColor winnerColorVal = ChessColor::White;
+  ChessColor *winnerColor = nullptr;
+  const GameState gameState = game_->getState();
+  if (gameState == GameState::Checkmate || gameState == GameState::Timeout) {
+    winnerColorVal = oppositeColor(game_->getCurrentTurn());
+    winnerColor = &winnerColorVal;
+  }
+
+  const ChessController::RenderState renderState = controller_->buildRenderState();
+  const DragPreview *dragPreview =
+      renderState.dragPreview.has_value() ? &renderState.dragPreview.value()
+                                          : nullptr;
+  const ChessColor *promotionColor =
+      renderState.promotionColor.has_value() ? &renderState.promotionColor.value()
+                                             : nullptr;
+
+  const Position *selectedSquare = nullptr;
+  if (controller_->getSelectedSquare().has_value()) {
+    selectedSquare = &controller_->getSelectedSquare().value();
+  }
+
+  view_->drawBoard(game_->getBoard(), selectedSquare, controller_->getLegalMoves(),
+                   renderState.showRestartConfirm,
+                   renderState.showWindowSizeDialog, gameState, winnerColor,
+                   dragPreview, promotionColor,
+                   game_->getWhiteTimeLeft(), game_->getBlackTimeLeft(),
+                   game_->getCurrentTurn());
 }

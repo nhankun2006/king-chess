@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <optional>
 
 // ─── Constructor ────────────────────────────────────────────────────────────
 
@@ -76,6 +77,59 @@ std::vector<Move> Game::getLegalMoves(Position pos) const {
   }
 
   return legalMoves;
+}
+
+std::vector<Move> Game::getLegalMovesBetween(Position from, Position to) const {
+  std::vector<Move> filteredMoves;
+  auto legalMoves = getLegalMoves(from);
+
+  for (const auto &move : legalMoves) {
+    if (move.to == to) {
+      filteredMoves.push_back(move);
+    }
+  }
+
+  return filteredMoves;
+}
+
+bool Game::hasPromotionChoices(Position from, Position to) const {
+  auto candidates = getLegalMovesBetween(from, to);
+  for (const auto &move : candidates) {
+    if (move.promotion != PieceType::None) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::optional<Move> Game::resolveLegalMove(Position from, Position to,
+                                           PieceType promotion) const {
+  auto candidates = getLegalMovesBetween(from, to);
+  if (candidates.empty()) {
+    return std::nullopt;
+  }
+
+  if (promotion == PieceType::None) {
+    for (const auto &move : candidates) {
+      if (move.promotion == PieceType::None) {
+        return move;
+      }
+    }
+
+    if (candidates.size() == 1) {
+      return candidates.front();
+    }
+
+    return std::nullopt;
+  }
+
+  for (const auto &move : candidates) {
+    if (move.promotion == promotion) {
+      return move;
+    }
+  }
+
+  return std::nullopt;
 }
 
 std::vector<Move> Game::getAllLegalMoves(ChessColor color) const {
