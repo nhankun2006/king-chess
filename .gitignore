@@ -44,4 +44,7 @@ vcpkg_installed/
 chess.drawio
 Makefile
 .clang-format
+
+#Other
+report/
 Proposal.md

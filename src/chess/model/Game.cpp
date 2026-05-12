@@ -278,7 +278,7 @@ bool Game::makeMove(const Move &move) {
   updateCastlingRights(move);
 
   // 5) Record the move
-  moveHistory_.push_back(move);
+  moveHistory_.push(move);
 
   const ChessColor movingColor = currentTurn_;
 
@@ -325,8 +325,8 @@ void Game::setTimeControl(int minutes) {
 }
 
 void Game::tickTimer(float dt) {
-  if (state_ != GameState::Playing && state_ != GameState::Check) return;
-  if (moveHistory_.empty()) return; // Đợi first move thì mới bắt đầu đếm ngược
+  if (state_ != GameState::Playing) return;
+  if (moveHistory_.isEmpty()) return; // Đợi first move thì mới bắt đầu đếm ngược
 
   if (currentTurn_ == ChessColor::White) {
     whiteTimeLeft_ -= dt;
@@ -358,10 +358,10 @@ bool Game::saveGame(const std::string &filename) const {
   out.write(reinterpret_cast<const char *>(&whiteTimeLeft_), sizeof(whiteTimeLeft_));
   out.write(reinterpret_cast<const char *>(&blackTimeLeft_), sizeof(blackTimeLeft_));
 
-  size_t numMoves = moveHistory_.size();
+  size_t numMoves = moveHistory_.getSize();
   out.write(reinterpret_cast<const char *>(&numMoves), sizeof(numMoves));
 
-  for (const auto &move : moveHistory_) {
+  for (const auto &move : moveHistory_.toVector()) {
     out.write(reinterpret_cast<const char *>(&move), sizeof(Move));
   }
 
@@ -423,11 +423,12 @@ bool Game::loadGame(const std::string &filename) {
 }
 
 bool Game::undo() {
-  if (moveHistory_.empty() || undoStack_.empty())
+  if (moveHistory_.isEmpty() || undoStack_.empty())
     return false;
 
-  moveHistory_.pop_back();
-  auto snapshot = undoStack_.back();
+  moveHistory_.pop();
+  
+  GameStateSnapshot snapshot = undoStack_.back();
   undoStack_.pop_back();
 
   board_ = snapshot.board;

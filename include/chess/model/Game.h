@@ -8,13 +8,14 @@
 #include <optional>
 #include <map>
 #include <vector>
+#include "chess/model/MoveStack.h"
 
 class Game {
 private:
   Board board_;
   ChessColor currentTurn_ = ChessColor::White;
   GameState state_ = GameState::Playing;
-  std::vector<Move> moveHistory_;
+  MoveStack moveHistory_;
   std::map<PieceType, int> capturedWhitePieces_;
   std::map<PieceType, int> capturedBlackPieces_;
   std::vector<Observer *> observers_;
@@ -53,7 +54,7 @@ public:
   GameState getState() const { return state_; }
   ChessColor getCurrentTurn() const { return currentTurn_; }
   const Board &getBoard() const { return board_; }
-  std::vector<Move> getMoveHistory() const { return moveHistory_; }
+  std::vector<Move> getMoveHistory() const { return moveHistory_.toVector(); }
 
   const std::map<PieceType, int> &getCapturedWhitePieces() const { return capturedWhitePieces_; }
   const std::map<PieceType, int> &getCapturedBlackPieces() const { return capturedBlackPieces_; }
