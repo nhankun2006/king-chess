@@ -2,6 +2,15 @@
 
 A modern chess game built with raylib and C++.
 
+## Features
+
+- **Game Modes:** Player vs Player (PvP) and Player vs Environment (PvE).
+- **AI Opponent:** Integrated Minimax AI for playing against the computer.
+- **Save & Load:** Auto-save functionality and Quick-save via the `S` key.
+- **Undo System:** O(1) stack-based undo mechanism.
+- **Interactive UI:** Drag and drop piece movement, legal move highlighting, and pawn promotion dialogs.
+- **Dynamic Resolution:** Multiple high-resolution window presets (up to 1700x1200) with dynamic auto-layout scaling.
+
 ## Build Dependencies
 
 - C++17 compiler
