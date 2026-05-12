@@ -16,13 +16,11 @@ bool WindowModalInteractionState::handleInput(ChessController &ctrl) {
   const Vector2 mousePos = GetMousePosition();
 
   if (ctrl.view_->isWindowSizeDialogCloseClicked(mousePos.x, mousePos.y)) {
-    ctrl.windowSizeDialogOpen_ = false;
     ctrl.setState(std::make_unique<IdleInteractionState>());
     return false;
   }
 
   if (ctrl.view_->isExitToMenuButtonClicked(mousePos.x, mousePos.y)) {
-    ctrl.windowSizeDialogOpen_ = false;
     return true; // signal exit to menu
   }
 
@@ -38,7 +36,6 @@ bool WindowModalInteractionState::handleInput(ChessController &ctrl) {
       std::fprintf(f, "%d %d\n", preset.width, preset.height);
       std::fclose(f);
     }
-    ctrl.windowSizeDialogOpen_ = false;
     ctrl.setState(std::make_unique<IdleInteractionState>());
   }
 

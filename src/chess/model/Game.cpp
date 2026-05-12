@@ -251,6 +251,14 @@ bool Game::makeMove(const Move &move) {
   if (!found)
     return false;
 
+  // 1.5) Save snapshot for Undo
+  undoStack_.push_back({
+    board_, currentTurn_, state_,
+    {castlingRights_[0], castlingRights_[1], castlingRights_[2], castlingRights_[3]},
+    whiteTimeLeft_, blackTimeLeft_,
+    capturedWhitePieces_, capturedBlackPieces_
+  });
+
   // 2) Detect capture before executing (target square or en passant)
   bool isCapture = move.isEnPassant;
   if (!isCapture) {
@@ -300,6 +308,7 @@ void Game::restart() {
   currentTurn_ = ChessColor::White;
   state_ = GameState::Playing;
   moveHistory_.clear();
+  undoStack_.clear();
   capturedWhitePieces_.clear();
   capturedBlackPieces_.clear();
   castlingRights_[0] = true;
@@ -414,21 +423,25 @@ bool Game::loadGame(const std::string &filename) {
 }
 
 bool Game::undo() {
-  if (moveHistory_.empty())
+  if (moveHistory_.empty() || undoStack_.empty())
     return false;
 
   moveHistory_.pop_back();
-  auto movesToReplay = moveHistory_;
+  auto snapshot = undoStack_.back();
+  undoStack_.pop_back();
 
-  auto savedObservers = observers_;
-  observers_.clear();
+  board_ = snapshot.board;
+  currentTurn_ = snapshot.currentTurn;
+  state_ = snapshot.state;
+  castlingRights_[0] = snapshot.castlingRights[0];
+  castlingRights_[1] = snapshot.castlingRights[1];
+  castlingRights_[2] = snapshot.castlingRights[2];
+  castlingRights_[3] = snapshot.castlingRights[3];
+  whiteTimeLeft_ = snapshot.whiteTimeLeft;
+  blackTimeLeft_ = snapshot.blackTimeLeft;
+  capturedWhitePieces_ = snapshot.capturedWhitePieces;
+  capturedBlackPieces_ = snapshot.capturedBlackPieces;
 
-  restart();
-  for (const auto &move : movesToReplay) {
-    makeMove(move);
-  }
-
-  observers_ = savedObservers;
   notify({GameEventType::GameLoaded, {}, {}, false, currentTurn_});
   return true;
 }

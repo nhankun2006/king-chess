@@ -39,9 +39,8 @@ void ChessController::clearSelection() {
 }
 
 void ChessController::stopDragging() {
-  isDraggingPiece_ = false;
-  dragFromSquare_.reset();
-  dragPieceType_ = PieceType::None;
+  // Dragging state is now handled polymorphically; 
+  // simply changing state cleans up the drag variables implicitly.
 }
 
 // Move execution
@@ -90,7 +89,7 @@ bool ChessController::isHumanVsBotMatch() const {
 }
 
 bool ChessController::isInputBlockedByUi() const {
-  return restartConfirmOpen_ || windowSizeDialogOpen_ || promotionPromptOpen_;
+  return state_ && state_->blocksBotInput();
 }
 
 bool ChessController::undoForCurrentMode() {
@@ -194,22 +193,11 @@ const std::vector<Move> &ChessController::getLegalMoves() const {
 
 ChessController::RenderState ChessController::buildRenderState() const {
   RenderState rs;
-  rs.showRestartConfirm = restartConfirmOpen_;
-  rs.showWindowSizeDialog = windowSizeDialogOpen_;
-
-  if (isDraggingPiece_ && dragFromSquare_.has_value() &&
-      dragPieceType_ != PieceType::None) {
-    DragPreview dp;
-    dp.type = dragPieceType_;
-    dp.color = dragPieceColor_;
-    dp.from = dragFromSquare_.value();
-    dp.mousePos = GetMousePosition();
-    rs.dragPreview = dp;
+  if (state_) {
+    rs.showRestartConfirm = state_->isRestartModalOpen();
+    rs.showWindowSizeDialog = state_->isWindowSizeDialogOpen();
+    rs.dragPreview = state_->getDragPreview();
+    rs.promotionColor = state_->getPromotionColor();
   }
-
-  if (promotionPromptOpen_) {
-    rs.promotionColor = promotionPromptColor_;
-  }
-
   return rs;
 }

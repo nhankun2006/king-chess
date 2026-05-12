@@ -45,17 +45,6 @@ private:
   std::optional<Position> selectedSquare_;
   std::vector<Move> selectedLegalMoves_;
 
-  bool restartConfirmOpen_ = false;
-  bool windowSizeDialogOpen_ = false;
-
-  bool isDraggingPiece_ = false;
-  std::optional<Position> dragFromSquare_;
-  PieceType dragPieceType_ = PieceType::None;
-  ChessColor dragPieceColor_ = ChessColor::White;
-
-  bool promotionPromptOpen_ = false;
-  ChessColor promotionPromptColor_ = ChessColor::White;
-
   bool botThinking_ = false;
 
   // Autosave settings
