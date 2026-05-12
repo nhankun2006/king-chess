@@ -12,6 +12,8 @@ public:
   PromotionInteractionState(Position from, Position to, ChessColor color);
 
   bool handleInput(ChessController &ctrl) override;
+  std::optional<ChessColor> getPromotionColor() const override { return color_; }
+  bool blocksBotInput() const override { return true; }
 
 private:
   Position from_;

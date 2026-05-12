@@ -14,7 +14,6 @@ bool BotTurnState::handleInput(ChessController &ctrl) {
             : ctrl.blackPlayer_.get();
 
     if (agent == nullptr || !agent->isAutomated()) {
-      ctrl.botThinking_ = false;
       ctrl.setState(std::make_unique<IdleInteractionState>());
       return false;
     }
@@ -33,7 +32,6 @@ bool BotTurnState::handleInput(ChessController &ctrl) {
     if (optMove.has_value()) {
       ctrl.applyMove(optMove.value());
     }
-    ctrl.botThinking_ = false;
     ctrl.setState(std::make_unique<IdleInteractionState>());
   }
 

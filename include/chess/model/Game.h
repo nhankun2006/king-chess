@@ -19,6 +19,18 @@ private:
   std::map<PieceType, int> capturedBlackPieces_;
   std::vector<Observer *> observers_;
 
+  struct GameStateSnapshot {
+    Board board;
+    ChessColor currentTurn;
+    GameState state;
+    bool castlingRights[4];
+    float whiteTimeLeft;
+    float blackTimeLeft;
+    std::map<PieceType, int> capturedWhitePieces;
+    std::map<PieceType, int> capturedBlackPieces;
+  };
+  std::vector<GameStateSnapshot> undoStack_;
+
   // Castling rights: [White kingside, White queenside, Black kingside, Black
   // queenside]
   bool castlingRights_[4] = {true, true, true, true};

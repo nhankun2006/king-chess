@@ -6,6 +6,8 @@
 class WindowModalInteractionState : public ChessControllerState {
 public:
   bool handleInput(ChessController &ctrl) override;
+  bool isWindowSizeDialogOpen() const override { return true; }
+  bool blocksBotInput() const override { return true; }
 };
 
 #endif // WINDOWMODALINTERACTIONSTATE_H

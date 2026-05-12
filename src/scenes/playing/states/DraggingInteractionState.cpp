@@ -29,9 +29,6 @@ bool DraggingInteractionState::handleInput(ChessController &ctrl) {
     // Delegate rule-level queries to the Game model
     if (ctrl.game_->hasPromotionChoices(from, dropSquare)) {
       // Transition to promotion dialog
-      ctrl.promotionPromptOpen_ = true;
-      ctrl.promotionPromptColor_ = dragPieceColor_;
-      ctrl.stopDragging();
       ctrl.setState(std::make_unique<PromotionInteractionState>(
           from, dropSquare, dragPieceColor_));
       return false;
@@ -50,7 +47,15 @@ bool DraggingInteractionState::handleInput(ChessController &ctrl) {
   }
 
   ctrl.clearSelection();
-  ctrl.stopDragging();
   ctrl.setState(std::make_unique<IdleInteractionState>());
   return false;
+}
+
+std::optional<DragPreview> DraggingInteractionState::getDragPreview() const {
+  DragPreview dp;
+  dp.type = dragPieceType_;
+  dp.color = dragPieceColor_;
+  dp.from = dragFrom_;
+  dp.mousePos = GetMousePosition();
+  return dp;
 }

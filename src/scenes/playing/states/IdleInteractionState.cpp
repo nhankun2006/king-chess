@@ -17,7 +17,6 @@ bool IdleInteractionState::handleInput(ChessController &ctrl) {
   // ── Toolbar buttons ──────────────────────────────────────────────────────
   if (ctrl.view_->isSettingsButtonClicked(mousePos.x, mousePos.y)) {
     ctrl.clearSelection();
-    ctrl.windowSizeDialogOpen_ = true;
     ctrl.setState(std::make_unique<WindowModalInteractionState>());
     return false;
   }
@@ -30,15 +29,12 @@ bool IdleInteractionState::handleInput(ChessController &ctrl) {
 
   if (ctrl.view_->isRestartButtonClicked(mousePos.x, mousePos.y)) {
     ctrl.clearSelection();
-    ctrl.windowSizeDialogOpen_ = false;
-    ctrl.restartConfirmOpen_ = true;
     ctrl.setState(std::make_unique<RestartModalInteractionState>());
     return false;
   }
 
   if (ctrl.view_->isUndoButtonClicked(mousePos.x, mousePos.y)) {
     ctrl.clearSelection();
-    ctrl.windowSizeDialogOpen_ = false;
     ctrl.undoForCurrentMode();
     return false;
   }
@@ -51,10 +47,6 @@ bool IdleInteractionState::handleInput(ChessController &ctrl) {
     if (clickedPiece != nullptr &&
         clickedPiece->getColor() == ctrl.game_->getCurrentTurn()) {
       ctrl.updateSelection(clickedSquare);
-      ctrl.isDraggingPiece_ = true;
-      ctrl.dragFromSquare_ = clickedSquare;
-      ctrl.dragPieceType_ = clickedPiece->getType();
-      ctrl.dragPieceColor_ = clickedPiece->getColor();
       ctrl.setState(std::make_unique<DraggingInteractionState>(
           clickedSquare, clickedPiece->getType(), clickedPiece->getColor()));
       return false;

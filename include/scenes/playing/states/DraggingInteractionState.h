@@ -11,6 +11,7 @@ public:
   DraggingInteractionState(Position from, PieceType type, ChessColor color);
 
   bool handleInput(ChessController &ctrl) override;
+  std::optional<DragPreview> getDragPreview() const override;
 
 private:
   Position dragFrom_;

@@ -12,16 +12,16 @@ struct WindowPreset {
 };
 
 namespace Window {
-constexpr int kInitialWidth = 700;
-constexpr int kInitialHeight = 512;
+constexpr int kInitialWidth = 1100;
+constexpr int kInitialHeight = 780;
 constexpr int kTargetFps = 60;
 constexpr int kSizePresetCount = 4;
 
 static constexpr WindowPreset kSizePresets[kSizePresetCount] = {
-    {700, 512, "700 x 512"},
-    {900, 650, "900 x 650"},
     {1100, 780, "1100 x 780"},
-    {1300, 920, "1300 x 920"}};
+    {1300, 920, "1300 x 920"},
+    {1500, 1060, "1500 x 1060"},
+    {1700, 1200, "1700 x 1200"}};
 } // namespace Window
 
 // -----------------------------------------------------------------------------

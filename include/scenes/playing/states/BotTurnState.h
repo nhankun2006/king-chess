@@ -14,6 +14,7 @@
 class BotTurnState : public ChessControllerState {
 public:
   bool handleInput(ChessController &ctrl) override;
+  bool isBotThinking() const override { return true; }
 
 private:
   std::future<std::optional<Move>> future_;

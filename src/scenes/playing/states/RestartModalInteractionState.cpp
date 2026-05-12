@@ -16,11 +16,8 @@ bool RestartModalInteractionState::handleInput(ChessController &ctrl) {
     ctrl.game_->restart();
     ctrl.view_->resetVisualEffects();
     ctrl.clearSelection();
-    ctrl.stopDragging();
-    ctrl.restartConfirmOpen_ = false;
     ctrl.setState(std::make_unique<IdleInteractionState>());
   } else if (ctrl.view_->isRestartConfirmNoClicked(mousePos.x, mousePos.y)) {
-    ctrl.restartConfirmOpen_ = false;
     ctrl.setState(std::make_unique<IdleInteractionState>());
   }
 

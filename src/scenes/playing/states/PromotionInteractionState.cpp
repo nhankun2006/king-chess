@@ -22,9 +22,7 @@ bool PromotionInteractionState::handleInput(ChessController &ctrl) {
     // Ask the Game model to resolve the exact move — no manual filtering
     auto move = ctrl.game_->resolveLegalMove(from_, to_, selectedPromotion);
     if (move.has_value() && ctrl.applyMove(move.value())) {
-      ctrl.promotionPromptOpen_ = false;
       ctrl.clearSelection();
-      ctrl.stopDragging();
       ctrl.setState(std::make_unique<IdleInteractionState>());
       return false;
     }
