@@ -32,8 +32,10 @@ int main() {
   SetTargetFPS(ui::Window::kTargetFps);
 
   // Use App / SceneManager based flow
-  App app;
-  app.run();
+  {
+    App app;
+    app.run();
+  } // use scope here, because deconstructor should be called before CloseWindow(), avoid memory leak (segfault 139)
 
   CloseAudioDevice();
   CloseWindow();
