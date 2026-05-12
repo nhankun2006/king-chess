@@ -767,10 +767,8 @@ CapturedSectionLayout computeCapturedSectionLayout(
                       : ui::RightPanel::kIconGapRegular) *
       capturedScale;
 
-  const int maxPerRow =
-      (sectionWidth - static_cast<int>(ui::RightPanel::kGridInsetWidth * uiScale)) /
-      static_cast<int>(layout.iconW + layout.gap);
-  layout.safeMaxPerRow = (maxPerRow > 0) ? maxPerRow : 1;
+  const int maxPerRow = 5;
+  layout.safeMaxPerRow = maxPerRow;
 
   const PieceType *pieceOrder = capturedPieceOrder();
   for (int index = 0; index < kCapturedPieceOrderCount; ++index) {
@@ -1094,7 +1092,7 @@ int ChessView::drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
     return layout.contentHeight;
   }
 
-  float iconX = static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
+  float iconX = static_cast<float>(sectionX) + (ui::RightPanel::kGridInsetX - 10.0f) * uiScale;
   float iconY = static_cast<float>(sectionY) + ui::RightPanel::kCapturedY * uiScale;
   int drawn = 0;
   const PieceType *pieceOrder = capturedPieceOrder();
@@ -1111,7 +1109,7 @@ int ChessView::drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
 
       drawn += 1;
       if (drawn % layout.safeMaxPerRow == 0) {
-        iconX = static_cast<float>(sectionX) + ui::RightPanel::kGridInsetX * uiScale;
+        iconX = static_cast<float>(sectionX) + (ui::RightPanel::kGridInsetX - 10.0f) * uiScale;
         iconY += layout.iconH + layout.gap;
       } else {
         iconX += layout.iconW + layout.gap;
@@ -1130,7 +1128,7 @@ int ChessView::getCapturedSectionHeight(
       .contentHeight;
 }
 
-void ChessView::drawRightPanel(const Board &board) {
+void ChessView::drawRightPanel(const Board &board, float whiteTimeLeft, float blackTimeLeft, ChessColor currentTurn) {
   std::map<PieceType, int> whiteRemaining;
   std::map<PieceType, int> blackRemaining;
   for (int row = 0; row < ui::Board::kSquaresPerSide; ++row) {
@@ -1314,14 +1312,13 @@ void ChessView::drawRightPanel(const Board &board) {
   }
 
   const bool swapCapturedSections = isBoardFlipped_;
-  const char *topTitle = swapCapturedSections ? "Black captured" : "White captured";
+  const char *topTitle = "";
   const ChessColor topPieceColor =
       swapCapturedSections ? ChessColor::White : ChessColor::Black;
   const std::map<PieceType, int> &topCaptured =
       swapCapturedSections ? capturedWhitePieces : capturedBlackPieces;
 
-  const char *bottomTitle =
-      swapCapturedSections ? "White captured" : "Black captured";
+  const char *bottomTitle = "";
   const ChessColor bottomPieceColor =
       swapCapturedSections ? ChessColor::Black : ChessColor::White;
   const std::map<PieceType, int> &bottomCaptured =
@@ -1345,6 +1342,37 @@ void ChessView::drawRightPanel(const Board &board) {
 
   drawCapturedSection(rightPanelX, bottomSectionY, rightPanelWidth, bottomTitle,
                       bottomPieceColor, bottomCaptured);
+
+  // Draw Timers
+  auto formatTime = [](float seconds) -> std::string {
+    int totalSecs = static_cast<int>(seconds);
+    if (totalSecs < 0) totalSecs = 0;
+    int minutes = totalSecs / 60;
+    int secs = totalSecs % 60;
+    char buffer[16];
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", minutes, secs);
+    return std::string(buffer);
+  };
+
+  std::string topTimeStr = formatTime(swapCapturedSections ? blackTimeLeft : whiteTimeLeft);
+  std::string bottomTimeStr = formatTime(swapCapturedSections ? whiteTimeLeft : blackTimeLeft);
+
+  const int timerFontSize = static_cast<int>(32.0f * uiScale);
+  const int boxWidth = static_cast<int>(120.0f * uiScale);
+  const int boxHeight = static_cast<int>(45.0f * uiScale);
+
+  auto drawTimerBox = [&](int x, int y, const std::string& timeStr, bool isActive) {
+      Rectangle timerRect = { static_cast<float>(x), static_cast<float>(y), static_cast<float>(boxWidth), static_cast<float>(boxHeight) };
+      // Chỉ hiện text, bỏ viền và background
+      int textWidth = MeasureText(timeStr.c_str(), timerFontSize);
+      DrawText(timeStr.c_str(),
+               x + (boxWidth - textWidth) / 2,
+               y + (boxHeight - timerFontSize) / 2,
+               timerFontSize, isActive ? ui::Dialog::kTextPrimary : ui::Dialog::kTextSecondary);
+  };
+
+  drawTimerBox(rightPanelX + 20, static_cast<int>(topSectionBottom + 5 * uiScale), topTimeStr, currentTurn == topPieceColor);
+  drawTimerBox(rightPanelX + 20, static_cast<int>(bottomSectionY - boxHeight - 5 * uiScale), bottomTimeStr, currentTurn == bottomPieceColor);
 }
 
 void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
@@ -1729,24 +1757,21 @@ void ChessView::drawBoard(const Board &board, const Position *selectedSquare,
                           GameState gameState, const ChessColor *winnerColor,
                           const DragPreview *dragPreview,
                           const ChessColor *promotionColor,
-                          bool showSaveMessage) {
-  const CastlingTween *castlingTween = getActiveCastlingTween();
-  const Position *invalidHighlightSquare = getActiveInvalidHighlightSquare();
-  const std::vector<CaptureEffect> burningPieces = collectBurningPieces(board);
-  CaptureEffect captureCounterPopupValue;
-  const CaptureEffect *captureCounterPopup =
-      getActiveCaptureCounterPopup(captureCounterPopupValue);
-
+                          float whiteTimeLeft, float blackTimeLeft,
+                          ChessColor currentTurn) {
   ClearBackground({0, 0, 0, 255});
-  drawBoardLayers(board, selectedSquare, legalMoves, castlingTween,
-                  dragPreview, invalidHighlightSquare, burningPieces,
-                  captureCounterPopup);
-  drawRightPanel(board);
+  
+  CaptureEffect capturePopupValue;
+  const CaptureEffect *captureCounterPopup = getActiveCaptureCounterPopup(capturePopupValue);
+
+  drawBoardLayers(board, selectedSquare, legalMoves, getActiveCastlingTween(), dragPreview,
+                  getActiveInvalidHighlightSquare(), collectBurningPieces(board), captureCounterPopup);
+  drawRightPanel(board, whiteTimeLeft, blackTimeLeft, currentTurn);
   drawDialogsAndOverlays(showRestartConfirm, showWindowSizeDialog, gameState,
                          winnerColor, promotionColor);
 
-  if (showSaveMessage && shouldShowSaveMessage()) {
-    const char *txt = "Game saved to save.bin";
+  if (shouldShowSaveMessage()) {
+    const char *txt = "Game saved";
     DrawRectangleRec({static_cast<float>(GetScreenWidth() / 2 - 160),
                       static_cast<float>(GetScreenHeight() - 80), 320.0f, 40.0f},
                      {20, 20, 20, 180});

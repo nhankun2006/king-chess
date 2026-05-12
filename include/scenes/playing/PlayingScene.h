@@ -5,6 +5,7 @@
 #include "scenes/main_menu/MainMenuScene.h" // For PlayMode
 #include "core/SceneManager.h"
 #include <memory>
+#include <string>
 #include "chess/model/Game.h"
 #include "scenes/playing/ChessView.h"
 #include "scenes/playing/ChessController.h"
@@ -21,10 +22,9 @@ private:
     bool initialized_ = false;
     bool loadFailed_ = false;
     double loadFailStartTime_ = 0.0;
+    std::string loadFailMessage_;
 
     static constexpr double kLoadFailMessageDurationSeconds_ = 1.5;
-    static constexpr const char* kLoadFailMessage_ =
-        "Failed to load save.bin - returning to menu";
 
 public:
     PlayingScene(PlayMode mode, bool loadSave);
@@ -35,3 +35,4 @@ public:
 };
 
 #endif // PLAYINGSCENE_H
+

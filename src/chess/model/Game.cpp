@@ -246,10 +246,40 @@ void Game::restart() {
   currentTurn_ = ChessColor::White;
   state_ = GameState::Playing;
   moveHistory_.clear();
+  capturedWhitePieces_.clear();
+  capturedBlackPieces_.clear();
   castlingRights_[0] = true;
   castlingRights_[1] = true;
   castlingRights_[2] = true;
   castlingRights_[3] = true;
+  setTimeControl(timeControlMinutes_);
+}
+
+void Game::setTimeControl(int minutes) {
+  timeControlMinutes_ = minutes;
+  whiteTimeLeft_ = minutes * 60.0f;
+  blackTimeLeft_ = minutes * 60.0f;
+}
+
+void Game::tickTimer(float dt) {
+  if (state_ != GameState::Playing && state_ != GameState::Check) return;
+  if (moveHistory_.empty()) return; // Đợi first move thì mới bắt đầu đếm ngược
+
+  if (currentTurn_ == ChessColor::White) {
+    whiteTimeLeft_ -= dt;
+    if (whiteTimeLeft_ <= 0.0f) {
+      whiteTimeLeft_ = 0.0f;
+      state_ = GameState::Timeout;
+      notify({GameEventType::Checkmate, {}, {}, false, currentTurn_}); // use checkmate event to trigger end screen
+    }
+  } else {
+    blackTimeLeft_ -= dt;
+    if (blackTimeLeft_ <= 0.0f) {
+      blackTimeLeft_ = 0.0f;
+      state_ = GameState::Timeout;
+      notify({GameEventType::Checkmate, {}, {}, false, currentTurn_});
+    }
+  }
 }
 
 // ─── Persistence and Undo ───────────────────────────────────────────────────
@@ -258,6 +288,12 @@ bool Game::saveGame(const std::string &filename) const {
   std::ofstream out(filename, std::ios::binary);
   if (!out)
     return false;
+
+  int version = 2; // version
+  out.write(reinterpret_cast<const char *>(&version), sizeof(version));
+  out.write(reinterpret_cast<const char *>(&timeControlMinutes_), sizeof(timeControlMinutes_));
+  out.write(reinterpret_cast<const char *>(&whiteTimeLeft_), sizeof(whiteTimeLeft_));
+  out.write(reinterpret_cast<const char *>(&blackTimeLeft_), sizeof(blackTimeLeft_));
 
   size_t numMoves = moveHistory_.size();
   out.write(reinterpret_cast<const char *>(&numMoves), sizeof(numMoves));
@@ -274,9 +310,25 @@ bool Game::loadGame(const std::string &filename) {
   if (!in)
     return false;
 
-  size_t numMoves = 0;
-  if (!in.read(reinterpret_cast<char *>(&numMoves), sizeof(numMoves)))
+  int version = 0;
+  if (!in.read(reinterpret_cast<char *>(&version), sizeof(version)))
     return false;
+
+  int savedControl = 5;
+  float savedWhite = 300.0f;
+  float savedBlack = 300.0f;
+  size_t numMoves = 0;
+
+  if (version == 2) {
+    in.read(reinterpret_cast<char *>(&savedControl), sizeof(savedControl));
+    in.read(reinterpret_cast<char *>(&savedWhite), sizeof(savedWhite));
+    in.read(reinterpret_cast<char *>(&savedBlack), sizeof(savedBlack));
+    if (!in.read(reinterpret_cast<char *>(&numMoves), sizeof(numMoves)))
+      return false;
+  } else {
+    // Old version, version is actually numMoves
+    numMoves = static_cast<size_t>(version);
+  }
 
   std::vector<Move> loadedMoves;
   for (size_t i = 0; i < numMoves; ++i) {
@@ -291,6 +343,13 @@ bool Game::loadGame(const std::string &filename) {
   observers_.clear();
 
   restart();
+  
+  if (version == 2) {
+    timeControlMinutes_ = savedControl;
+    whiteTimeLeft_ = savedWhite;
+    blackTimeLeft_ = savedBlack;
+  }
+
   for (const auto &move : loadedMoves) {
     makeMove(move);
   }

@@ -43,16 +43,22 @@ void ChessController::triggerInvalidMoveWarning(
 bool ChessController::processInput() {
   bool movedThisFrame = false;
 
+  // Tick the game timer
+  const float dt = GetFrameTime();
+  game_->tickTimer(dt);
+
+  // Quick-save hotkey
   if (IsKeyPressed(KEY_S)) {
-    if (game_->saveGame("save.bin")) {
+    if (game_->saveGame(saveFileName_)) {
       view_->triggerSaveMessage();
     }
   }
 
+  // Periodic autosave
   if (autosavePeriodic_) {
     const double now = GetTime();
     if (now - lastAutosaveTime_ >= autosaveIntervalSeconds_) {
-      if (game_->saveGame("save.bin")) {
+      if (game_->saveGame(saveFileName_)) {
         view_->triggerSaveMessage();
       }
       lastAutosaveTime_ = now;
@@ -262,7 +268,7 @@ bool ChessController::processInput() {
   }
 
   if (movedThisFrame && autosaveOnMove_) {
-    if (game_->saveGame("save.bin")) {
+    if (game_->saveGame(saveFileName_)) {
       view_->triggerSaveMessage();
     }
   }
@@ -285,7 +291,7 @@ void ChessController::render() {
   ChessColor winnerColorVal = ChessColor::White;
   ChessColor *winnerColor = nullptr;
   const GameState gameState = game_->getState();
-  if (gameState == GameState::Checkmate) {
+  if (gameState == GameState::Checkmate || gameState == GameState::Timeout) {
     winnerColorVal = oppositeColor(game_->getCurrentTurn());
     winnerColor = &winnerColorVal;
   }
@@ -299,5 +305,6 @@ void ChessController::render() {
                    selectedSquare_.has_value() ? &selectedSquare_.value() : nullptr,
                    selectedLegalMoves_, restartConfirmOpen_, windowSizeDialogOpen_,
                    gameState, winnerColor, dragPreview, promotionColor,
-                   true);
+                   game_->getWhiteTimeLeft(), game_->getBlackTimeLeft(),
+                   game_->getCurrentTurn());
 }
