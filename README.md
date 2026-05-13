@@ -39,7 +39,7 @@ sudo pacman -S raylib
 sudo zypper install raylib-devel
 ```
 
-Configure and build:
+Configure and build manually (debug mode by default):
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -49,8 +49,13 @@ cmake --build build -j$(nproc)
 Or use presets:
 
 ```bash
+# Debug build
 cmake --preset linux-debug
-cmake --build --preset linux-build
+cmake --build --preset linux-debug-build
+
+# Release build
+cmake --preset linux-release
+cmake --build --preset linux-release-build
 ```
 Run:
 
@@ -67,7 +72,7 @@ Run:
 1. Install [MinGW-w64](https://www.mingw-w64.org/) and ensure `gcc`, `g++`,
    and `mingw32-make` are on your `PATH`.
 2. Install [vcpkg](https://github.com/microsoft/vcpkg) and set the
-   `VCPKG_ROOT` environment variable to its install path.
+   `VCPKG_ROOT` environment variable to its install path (example: `$env:VCPKG_ROOT = "C:\ProgramData\vcpkg"`).
 
 ### Build
 
