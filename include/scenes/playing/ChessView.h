@@ -106,6 +106,10 @@ private:
                               bool showWindowSizeDialog, GameState gameState,
                               const ChessColor *winnerColor,
                               const ChessColor *promotionColor);
+  void drawGameOverDialog(GameState gameState, const ChessColor *winnerColor);
+  void drawRestartConfirmDialog();
+  void drawWindowSizeDialog();
+  void drawPromotionDialog(ChessColor promotionColor);
   int drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
                           const char *title, ChessColor capturedColor,
                           const std::map<PieceType, int> &captured);

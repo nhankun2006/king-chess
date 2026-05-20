@@ -532,62 +532,33 @@ bool ChessView::shouldShowSaveMessage() const {
 }
 
 bool ChessView::isSettingsButtonClicked(float x, float y) const {
-  const Rectangle settingsButton = getSettingsButtonRect();
-  if (settingsButton.width <= 0.0f || settingsButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= settingsButton.x &&
-         x <= settingsButton.x + settingsButton.width &&
-         y >= settingsButton.y && y <= settingsButton.y + settingsButton.height;
+  return CheckCollisionPointRec({x, y}, getSettingsButtonRect());
 }
 
 bool ChessView::isRotateButtonClicked(float x, float y) const {
-  const Rectangle rotateButton = getRotateButtonRect();
-  if (rotateButton.width <= 0.0f || rotateButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= rotateButton.x && x <= rotateButton.x + rotateButton.width &&
-         y >= rotateButton.y && y <= rotateButton.y + rotateButton.height;
+  return CheckCollisionPointRec({x, y}, getRotateButtonRect());
 }
 
 bool ChessView::isRestartButtonClicked(float x, float y) const {
-  const Rectangle restartButton = getRestartButtonRect();
-  if (restartButton.width <= 0.0f || restartButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= restartButton.x && x <= restartButton.x + restartButton.width &&
-         y >= restartButton.y && y <= restartButton.y + restartButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartButtonRect());
 }
 
 bool ChessView::isUndoButtonClicked(float x, float y) const {
-  const Rectangle undoButton = getUndoButtonRect();
-  if (undoButton.width <= 0.0f || undoButton.height <= 0.0f) {
-    return false;
-  }
-  return x >= undoButton.x && x <= undoButton.x + undoButton.width &&
-         y >= undoButton.y && y <= undoButton.y + undoButton.height;
+  return CheckCollisionPointRec({x, y}, getUndoButtonRect());
 }
 
 int ChessView::getWindowSizeOptionClicked(float x, float y) const {
   for (int index = 0; index < ui::Window::kSizePresetCount; ++index) {
-    const Rectangle option = getWindowSizeOptionRect(index);
-    if (x >= option.x && x <= option.x + option.width && y >= option.y &&
-        y <= option.y + option.height) {
+    if (CheckCollisionPointRec({x, y}, getWindowSizeOptionRect(index))) {
       return index;
     }
   }
-
   return -1;
 }
 
 PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
   for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
-    const Rectangle option = getPromotionOptionRect(index);
-    if (x >= option.x && x <= option.x + option.width && y >= option.y &&
-        y <= option.y + option.height) {
+    if (CheckCollisionPointRec({x, y}, getPromotionOptionRect(index))) {
       return kPromotionOptions[index];
     }
   }
@@ -595,27 +566,19 @@ PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
 }
 
 bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
-  const Rectangle closeButton = getWindowSizeCloseButtonRect();
-  return x >= closeButton.x && x <= closeButton.x + closeButton.width &&
-         y >= closeButton.y && y <= closeButton.y + closeButton.height;
+  return CheckCollisionPointRec({x, y}, getWindowSizeCloseButtonRect());
 }
 
 bool ChessView::isExitToMenuButtonClicked(float x, float y) const {
-  const Rectangle btn = getExitToMenuButtonRect();
-  return x >= btn.x && x <= btn.x + btn.width &&
-         y >= btn.y && y <= btn.y + btn.height;
+  return CheckCollisionPointRec({x, y}, getExitToMenuButtonRect());
 }
 
 bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
-  const Rectangle yesButton = getRestartConfirmYesButtonRect();
-  return x >= yesButton.x && x <= yesButton.x + yesButton.width &&
-         y >= yesButton.y && y <= yesButton.y + yesButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartConfirmYesButtonRect());
 }
 
 bool ChessView::isRestartConfirmNoClicked(float x, float y) const {
-  const Rectangle noButton = getRestartConfirmNoButtonRect();
-  return x >= noButton.x && x <= noButton.x + noButton.width &&
-         y >= noButton.y && y <= noButton.y + noButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartConfirmNoButtonRect());
 }
 
 bool ChessView::screenToBoardSquare(float x, float y, Position &out) const {
