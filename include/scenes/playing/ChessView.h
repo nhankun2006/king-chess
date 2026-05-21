@@ -14,8 +14,6 @@
 #include "chess/model/Move.h"
 #include "chess/model/Observer.h"
 
-// ─── View-related data structs ──────────────────────────────────────────────
-
 struct CastlingTween {
   ChessColor color = ChessColor::White;
   Position kingFrom{};
@@ -37,8 +35,6 @@ struct CaptureEffect {
   int captureCount = 0;
   float progress = 0.0f;
 };
-
-// ─── ChessView ──────────────────────────────────────────────────────────────
 
 class ChessView : public Observer {
 private:
