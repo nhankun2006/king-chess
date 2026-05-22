@@ -2,10 +2,10 @@
 
 namespace ui {
 
-Dialog::Dialog(Rectangle bounds, const std::string& title, const std::string& body, const DialogStyle& style)
+DialogBox::DialogBox(Rectangle bounds, const std::string& title, const std::string& body, const DialogStyle& style)
     : bounds_(bounds), title_(title), body_(body), style_(style) {}
 
-void Dialog::draw() const {
+void DialogBox::draw() const {
     // Draw screen overlay (dimming the background)
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), style_.overlayColor);
 

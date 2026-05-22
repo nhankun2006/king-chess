@@ -21,7 +21,7 @@ struct DialogStyle {
     int bodyFontSize = 16;
 };
 
-class Dialog {
+class DialogBox {
 private:
     Rectangle bounds_;
     std::string title_;
@@ -29,7 +29,7 @@ private:
     DialogStyle style_;
 
 public:
-    Dialog(Rectangle bounds, const std::string& title, const std::string& body = "", const DialogStyle& style = DialogStyle{});
+    DialogBox(Rectangle bounds, const std::string& title, const std::string& body = "", const DialogStyle& style = DialogStyle{});
 
     // Draws the overlay and the dialog box itself
     void draw() const;
