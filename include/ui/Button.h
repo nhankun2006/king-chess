@@ -34,6 +34,8 @@ private:
     ButtonState state_;
     ButtonStyle style_;
     std::function<void()> onClick_;
+    Texture2D icon_ = {0};
+    std::string tooltip_ = "";
 
 public:
     Button(Rectangle bounds, const std::string& text, const ButtonStyle& style = ButtonStyle{});
@@ -48,6 +50,8 @@ public:
     void setBounds(Rectangle bounds) { bounds_ = bounds; }
     void setDisabled(bool disabled) { state_ = disabled ? ButtonState::Disabled : ButtonState::Normal; }
     void setOnClick(std::function<void()> callback) { onClick_ = callback; }
+    void setIcon(Texture2D icon) { icon_ = icon; }
+    void setTooltip(const std::string& tooltip) { tooltip_ = tooltip; }
 };
 
 } // namespace ui
