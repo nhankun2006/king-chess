@@ -143,18 +143,10 @@ bool ChessView::LoadAssets() {
       for (int x = 0; x < image.width; ++x) {
         const auto pixel = pixels[y * image.width + x];
         if (pixel.a > 0) {
-          if (x < minX) {
-            minX = x;
-          }
-          if (y < minY) {
-            minY = y;
-          }
-          if (x > maxX) {
-            maxX = x;
-          }
-          if (y > maxY) {
-            maxY = y;
-          }
+          minX = std::min(minX, x);
+          minY = std::min(minY, y);
+          maxX = std::max(maxX, x);
+          maxY = std::max(maxY, y);
         }
       }
     }
@@ -210,13 +202,14 @@ bool ChessView::LoadAssets() {
   loadTextureWithFallback("burning_loop_1.png", burningLoopTexture_);
   loadTextureWithFallback("burning_loop_2.png", burningLoop2Texture_);
 
-  static const std::pair<PieceType, std::string> pieces[] = {
-      {PieceType::Pawn, "Pawn"},     {PieceType::Knight, "Knight"},
-      {PieceType::Bishop, "Bishop"}, {PieceType::Rook, "Rook"},
-      {PieceType::Queen, "Queen"},   {PieceType::King, "King"},
+  static const PieceType pieceTypes[] = {
+      PieceType::Pawn, PieceType::Knight, PieceType::Bishop,
+      PieceType::Rook, PieceType::Queen,  PieceType::King
   };
 
-  for (const auto &[type, name] : pieces) {
+  for (const auto &type : pieceTypes) {
+    std::string name = getPieceName(type);
+    
     std::string whiteTexturePath;
     if (!loadTextureWithFallback("W_" + name + ".png", whiteTextures_[type],
                                  &whiteTexturePath)) {

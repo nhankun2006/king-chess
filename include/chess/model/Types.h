@@ -25,4 +25,17 @@ inline ChessColor oppositeColor(ChessColor c) {
   return (c == ChessColor::White) ? ChessColor::Black : ChessColor::White;
 }
 
+// Helper to get string representation of PieceType
+inline const char* getPieceName(PieceType type) {
+  switch (type) {
+    case PieceType::Pawn: return "Pawn";
+    case PieceType::Knight: return "Knight";
+    case PieceType::Bishop: return "Bishop";
+    case PieceType::Rook: return "Rook";
+    case PieceType::Queen: return "Queen";
+    case PieceType::King: return "King";
+    default: return "None";
+  }
+}
+
 #endif // TYPES_H
