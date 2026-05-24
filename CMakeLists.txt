@@ -52,6 +52,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Threads::Threads
 )
 
+# ─── Winsock2 linking for networking module ───────────────────────────────────
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 iphlpapi)
+endif()
+
 # ─── Copy assets to build directory ──────────────────────────────────────────
 if(EXISTS "${CMAKE_SOURCE_DIR}/assets")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
