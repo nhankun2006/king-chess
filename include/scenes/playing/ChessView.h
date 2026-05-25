@@ -13,8 +13,7 @@
 #include "chess/model/Board.h"
 #include "chess/model/Move.h"
 #include "chess/model/Observer.h"
-
-// ─── View-related data structs ──────────────────────────────────────────────
+#include "config/UIConfig.h"
 
 struct CastlingTween {
   ChessColor color = ChessColor::White;
@@ -37,8 +36,6 @@ struct CaptureEffect {
   int captureCount = 0;
   float progress = 0.0f;
 };
-
-// ─── ChessView ──────────────────────────────────────────────────────────────
 
 class ChessView : public Observer {
 private:
@@ -69,6 +66,12 @@ private:
   float saveMessageDurationSeconds_ = 1.2f;
   bool isBoardFlipped_ = true;
   std::string lastAssetError_;
+
+  mutable ui::AutoLayout::Metrics cachedMetrics_{};
+  mutable int lastScreenWidth_ = 0;
+  mutable int lastScreenHeight_ = 0;
+
+  const ui::AutoLayout::Metrics& getMetrics() const;
 
   Rectangle getBoardRenderRect() const;
   Rectangle getRightPanelRect() const;
@@ -106,6 +109,10 @@ private:
                               bool showWindowSizeDialog, GameState gameState,
                               const ChessColor *winnerColor,
                               const ChessColor *promotionColor);
+  void drawGameOverDialog(GameState gameState, const ChessColor *winnerColor);
+  void drawRestartConfirmDialog();
+  void drawWindowSizeDialog();
+  void drawPromotionDialog(ChessColor promotionColor);
   int drawCapturedSection(int sectionX, int sectionY, int sectionWidth,
                           const char *title, ChessColor capturedColor,
                           const std::map<PieceType, int> &captured);

@@ -3,6 +3,8 @@
 #include <cmath>
 
 #include "config/UIConfig.h"
+#include "ui/Dialog.h"
+#include "ui/Button.h"
 
 namespace {
 constexpr PieceType kPromotionOptions[ui::Dialog::kPromotionOptionCount] = {
@@ -141,18 +143,10 @@ bool ChessView::LoadAssets() {
       for (int x = 0; x < image.width; ++x) {
         const auto pixel = pixels[y * image.width + x];
         if (pixel.a > 0) {
-          if (x < minX) {
-            minX = x;
-          }
-          if (y < minY) {
-            minY = y;
-          }
-          if (x > maxX) {
-            maxX = x;
-          }
-          if (y > maxY) {
-            maxY = y;
-          }
+          minX = std::min(minX, x);
+          minY = std::min(minY, y);
+          maxX = std::max(maxX, x);
+          maxY = std::max(maxY, y);
         }
       }
     }
@@ -208,13 +202,14 @@ bool ChessView::LoadAssets() {
   loadTextureWithFallback("burning_loop_1.png", burningLoopTexture_);
   loadTextureWithFallback("burning_loop_2.png", burningLoop2Texture_);
 
-  static const std::pair<PieceType, std::string> pieces[] = {
-      {PieceType::Pawn, "Pawn"},     {PieceType::Knight, "Knight"},
-      {PieceType::Bishop, "Bishop"}, {PieceType::Rook, "Rook"},
-      {PieceType::Queen, "Queen"},   {PieceType::King, "King"},
+  static const PieceType pieceTypes[] = {
+      PieceType::Pawn, PieceType::Knight, PieceType::Bishop,
+      PieceType::Rook, PieceType::Queen,  PieceType::King
   };
 
-  for (const auto &[type, name] : pieces) {
+  for (const auto &type : pieceTypes) {
+    std::string name = getPieceName(type);
+    
     std::string whiteTexturePath;
     if (!loadTextureWithFallback("W_" + name + ".png", whiteTextures_[type],
                                  &whiteTexturePath)) {
@@ -270,21 +265,30 @@ Rectangle ChessView::getBoardGridRect() const {
   return {gridLeft, gridTop, gridWidth, gridHeight};
 }
 
+
+const ui::AutoLayout::Metrics& ChessView::getMetrics() const {
+  int currentW = GetScreenWidth();
+  int currentH = GetScreenHeight();
+  if (currentW != lastScreenWidth_ || currentH != lastScreenHeight_) {
+    cachedMetrics_ = ui::AutoLayout::ComputeMetrics(currentW, currentH);
+    lastScreenWidth_ = currentW;
+    lastScreenHeight_ = currentH;
+  }
+  return cachedMetrics_;
+}
+
 Rectangle ChessView::getBoardRenderRect() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return m.boardRect;
 }
 
 Rectangle ChessView::getRightPanelRect() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return m.rightPanelRect;
 }
 
 float ChessView::getUiScale() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return m.uiScale;
 }
 
@@ -294,8 +298,7 @@ Rectangle ChessView::getSettingsButtonRect() const {
     return {0.0f, 0.0f, 0.0f, 0.0f};
   }
 
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   const float buttonSize = ui::AutoLayout::IconButtonSize(m);
   const float buttonGap = ui::AutoLayout::IconButtonGap(m);
   // Grid 2x2 layout instead of 1x4
@@ -307,16 +310,14 @@ Rectangle ChessView::getSettingsButtonRect() const {
 
 Rectangle ChessView::getRotateButtonRect() const {
   const Rectangle settingsButton = getSettingsButtonRect();
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return {settingsButton.x + settingsButton.width + ui::AutoLayout::IconButtonGap(m),
           settingsButton.y, settingsButton.width, settingsButton.height};
 }
 
 Rectangle ChessView::getRestartButtonRect() const {
   const Rectangle settingsButton = getSettingsButtonRect();
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return {settingsButton.x,
            settingsButton.y + settingsButton.height + ui::AutoLayout::IconButtonGap(m),
            settingsButton.width, settingsButton.height};
@@ -324,16 +325,14 @@ Rectangle ChessView::getRestartButtonRect() const {
 
 Rectangle ChessView::getUndoButtonRect() const {
   const Rectangle rotateButton = getRotateButtonRect();
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return {rotateButton.x,
           rotateButton.y + rotateButton.height + ui::AutoLayout::IconButtonGap(m),
           rotateButton.width, rotateButton.height};
 }
 
 Rectangle ChessView::getRestartConfirmDialogRect() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return ui::AutoLayout::RestartDialogRect(m);
 }
 
@@ -361,8 +360,7 @@ Rectangle ChessView::getRestartConfirmNoButtonRect() const {
 }
 
 Rectangle ChessView::getWindowSizeDialogRect() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return ui::AutoLayout::WindowSizeDialogRect(m);
 }
 
@@ -406,8 +404,7 @@ Rectangle ChessView::getExitToMenuButtonRect() const {
 }
 
 Rectangle ChessView::getPromotionDialogRect() const {
-  const ui::AutoLayout::Metrics m =
-      ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
+  const ui::AutoLayout::Metrics &m = getMetrics();
   return ui::AutoLayout::PromotionDialogRect(m);
 }
 
@@ -532,62 +529,33 @@ bool ChessView::shouldShowSaveMessage() const {
 }
 
 bool ChessView::isSettingsButtonClicked(float x, float y) const {
-  const Rectangle settingsButton = getSettingsButtonRect();
-  if (settingsButton.width <= 0.0f || settingsButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= settingsButton.x &&
-         x <= settingsButton.x + settingsButton.width &&
-         y >= settingsButton.y && y <= settingsButton.y + settingsButton.height;
+  return CheckCollisionPointRec({x, y}, getSettingsButtonRect());
 }
 
 bool ChessView::isRotateButtonClicked(float x, float y) const {
-  const Rectangle rotateButton = getRotateButtonRect();
-  if (rotateButton.width <= 0.0f || rotateButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= rotateButton.x && x <= rotateButton.x + rotateButton.width &&
-         y >= rotateButton.y && y <= rotateButton.y + rotateButton.height;
+  return CheckCollisionPointRec({x, y}, getRotateButtonRect());
 }
 
 bool ChessView::isRestartButtonClicked(float x, float y) const {
-  const Rectangle restartButton = getRestartButtonRect();
-  if (restartButton.width <= 0.0f || restartButton.height <= 0.0f) {
-    return false;
-  }
-
-  return x >= restartButton.x && x <= restartButton.x + restartButton.width &&
-         y >= restartButton.y && y <= restartButton.y + restartButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartButtonRect());
 }
 
 bool ChessView::isUndoButtonClicked(float x, float y) const {
-  const Rectangle undoButton = getUndoButtonRect();
-  if (undoButton.width <= 0.0f || undoButton.height <= 0.0f) {
-    return false;
-  }
-  return x >= undoButton.x && x <= undoButton.x + undoButton.width &&
-         y >= undoButton.y && y <= undoButton.y + undoButton.height;
+  return CheckCollisionPointRec({x, y}, getUndoButtonRect());
 }
 
 int ChessView::getWindowSizeOptionClicked(float x, float y) const {
   for (int index = 0; index < ui::Window::kSizePresetCount; ++index) {
-    const Rectangle option = getWindowSizeOptionRect(index);
-    if (x >= option.x && x <= option.x + option.width && y >= option.y &&
-        y <= option.y + option.height) {
+    if (CheckCollisionPointRec({x, y}, getWindowSizeOptionRect(index))) {
       return index;
     }
   }
-
   return -1;
 }
 
 PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
   for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
-    const Rectangle option = getPromotionOptionRect(index);
-    if (x >= option.x && x <= option.x + option.width && y >= option.y &&
-        y <= option.y + option.height) {
+    if (CheckCollisionPointRec({x, y}, getPromotionOptionRect(index))) {
       return kPromotionOptions[index];
     }
   }
@@ -595,27 +563,19 @@ PieceType ChessView::getPromotionOptionClicked(float x, float y) const {
 }
 
 bool ChessView::isWindowSizeDialogCloseClicked(float x, float y) const {
-  const Rectangle closeButton = getWindowSizeCloseButtonRect();
-  return x >= closeButton.x && x <= closeButton.x + closeButton.width &&
-         y >= closeButton.y && y <= closeButton.y + closeButton.height;
+  return CheckCollisionPointRec({x, y}, getWindowSizeCloseButtonRect());
 }
 
 bool ChessView::isExitToMenuButtonClicked(float x, float y) const {
-  const Rectangle btn = getExitToMenuButtonRect();
-  return x >= btn.x && x <= btn.x + btn.width &&
-         y >= btn.y && y <= btn.y + btn.height;
+  return CheckCollisionPointRec({x, y}, getExitToMenuButtonRect());
 }
 
 bool ChessView::isRestartConfirmYesClicked(float x, float y) const {
-  const Rectangle yesButton = getRestartConfirmYesButtonRect();
-  return x >= yesButton.x && x <= yesButton.x + yesButton.width &&
-         y >= yesButton.y && y <= yesButton.y + yesButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartConfirmYesButtonRect());
 }
 
 bool ChessView::isRestartConfirmNoClicked(float x, float y) const {
-  const Rectangle noButton = getRestartConfirmNoButtonRect();
-  return x >= noButton.x && x <= noButton.x + noButton.width &&
-         y >= noButton.y && y <= noButton.y + noButton.height;
+  return CheckCollisionPointRec({x, y}, getRestartConfirmNoButtonRect());
 }
 
 bool ChessView::screenToBoardSquare(float x, float y, Position &out) const {
@@ -1180,136 +1140,39 @@ void ChessView::drawRightPanel(const Board &board, float whiteTimeLeft, float bl
   const Rectangle rotateButton = getRotateButtonRect();
   const Rectangle restartButton = getRestartButtonRect();
   const Rectangle undoButton = getUndoButtonRect();
-  const bool settingsHovered = CheckCollisionPointRec(mousePos, settingsButton);
-  const bool rotateHovered = CheckCollisionPointRec(mousePos, rotateButton);
-  const bool restartHovered = CheckCollisionPointRec(mousePos, restartButton);
-  const bool undoHovered = CheckCollisionPointRec(mousePos, undoButton);
+  ui::ButtonStyle iconStyle;
+  iconStyle.baseColor = ui::IconButtons::kButtonFill;
+  iconStyle.hoverColor = ui::IconButtons::kButtonFillHover;
+  iconStyle.borderColor = ui::IconButtons::kButtonBorder;
+  iconStyle.borderHoverColor = ui::IconButtons::kButtonBorderHover;
+  iconStyle.textColor = ui::Dialog::kTextPrimary;
+  iconStyle.roundness = ui::IconButtons::kRoundness;
+  iconStyle.segments = ui::IconButtons::kSegments;
+  iconStyle.borderWidth = ui::IconButtons::kBorderWidth;
+  iconStyle.fontSize = static_cast<int>(ui::IconButtons::kIconSize * getUiScale() * 0.6f);
 
-  const float uiScale = getUiScale();
-  
-  const auto drawRoundedIconButton = [uiScale](Rectangle buttonRect, bool hovered) {
-    if (hovered) {
-      const float boost = ui::IconButtons::kHoverBoost * uiScale;
-      buttonRect.x -= boost;
-      buttonRect.y -= boost;
-      buttonRect.width += boost * 2.0f;
-      buttonRect.height += boost * 2.0f;
-    }
+  ui::Button settingsBtn(settingsButton, settingIconTexture_.id != 0 ? "" : "Set", iconStyle);
+  if (settingIconTexture_.id != 0) settingsBtn.setIcon(settingIconTexture_);
+  settingsBtn.setTooltip("Window size");
+  settingsBtn.update(mousePos);
+  settingsBtn.draw();
 
-    DrawRectangleRounded(buttonRect, ui::IconButtons::kRoundness,
-                        ui::IconButtons::kSegments,
-                        hovered ? ui::IconButtons::kButtonFillHover
-                                : ui::IconButtons::kButtonFill);
-    DrawRectangleRoundedLinesEx(buttonRect, ui::IconButtons::kRoundness,
-                                ui::IconButtons::kSegments,
-                                ui::IconButtons::kBorderWidth,
-                                hovered ? ui::IconButtons::kButtonBorderHover
-                                        : ui::IconButtons::kButtonBorder);
-  };
+  ui::Button rotateBtn(rotateButton, rotateIconTexture_.id != 0 ? "" : "Rot", iconStyle);
+  if (rotateIconTexture_.id != 0) rotateBtn.setIcon(rotateIconTexture_);
+  rotateBtn.setTooltip("Rotate board");
+  rotateBtn.update(mousePos);
+  rotateBtn.draw();
 
-  drawRoundedIconButton(settingsButton, settingsHovered);
-  drawRoundedIconButton(rotateButton, rotateHovered);
-  drawRoundedIconButton(restartButton, restartHovered);
-  drawRoundedIconButton(undoButton, undoHovered);
+  ui::Button restartBtn(restartButton, restartIconTexture_.id != 0 ? "" : "Res", iconStyle);
+  if (restartIconTexture_.id != 0) restartBtn.setIcon(restartIconTexture_);
+  restartBtn.setTooltip("Restart game");
+  restartBtn.update(mousePos);
+  restartBtn.draw();
 
-  const float buttonIconSize = ui::IconButtons::kIconSize * uiScale;
-
-  if (settingIconTexture_.id != 0) {
-    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(settingIconTexture_.width),
-                               static_cast<float>(settingIconTexture_.height)};
-    const Rectangle iconDst = {
-        settingsButton.x + (settingsButton.width - buttonIconSize) * 0.5f,
-        settingsButton.y + (settingsButton.height - buttonIconSize) * 0.5f,
-        buttonIconSize, buttonIconSize};
-    DrawTexturePro(settingIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                   {255, 255, 255, 255});
-  } else {
-    DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
-                 settingsButton.y + settingsButton.height * 0.5f},
-                ui::IconButtons::kFallbackSettingsOuterRadius * uiScale,
-                {235, 235, 235, 255});
-    DrawCircleV({settingsButton.x + settingsButton.width * 0.5f,
-                 settingsButton.y + settingsButton.height * 0.5f},
-                ui::IconButtons::kFallbackSettingsInnerRadius * uiScale,
-                {48, 58, 78, 255});
-  }
-
-  if (rotateIconTexture_.id != 0) {
-    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(rotateIconTexture_.width),
-                               static_cast<float>(rotateIconTexture_.height)};
-    const Rectangle iconDst = {
-        rotateButton.x + (rotateButton.width - buttonIconSize) * 0.5f,
-        rotateButton.y + (rotateButton.height - buttonIconSize) * 0.5f,
-        buttonIconSize, buttonIconSize};
-    DrawTexturePro(rotateIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                   {255, 255, 255, 255});
-  } else {
-    DrawText("R",
-             static_cast<int>(rotateButton.x +
-                              ui::IconButtons::kFallbackRotateLabelX * uiScale),
-             static_cast<int>(rotateButton.y +
-                              ui::IconButtons::kFallbackRotateLabelY * uiScale),
-             static_cast<int>(ui::IconButtons::kIconSize * uiScale),
-             ui::Dialog::kTextPrimary);
-  }
-
-  if (restartIconTexture_.id != 0) {
-    const Rectangle iconSrc = {0.0f, 0.0f, static_cast<float>(restartIconTexture_.width),
-                               static_cast<float>(restartIconTexture_.height)};
-    const Rectangle iconDst = {
-        restartButton.x + (restartButton.width - buttonIconSize) * 0.5f,
-        restartButton.y + (restartButton.height - buttonIconSize) * 0.5f,
-        buttonIconSize, buttonIconSize};
-    DrawTexturePro(restartIconTexture_, iconSrc, iconDst, {0.0f, 0.0f}, 0.0f,
-                   {255, 255, 255, 255});
-  } else {
-    const float cx = restartButton.x + restartButton.width * 0.5f;
-    const float cy = restartButton.y + restartButton.height * 0.5f;
-    DrawRing({cx, cy}, ui::IconButtons::kRestartRingInner * uiScale,
-             ui::IconButtons::kRestartRingOuter * uiScale,
-             ui::IconButtons::kRestartRingStartDeg,
-             ui::IconButtons::kRestartRingEndDeg,
-             ui::IconButtons::kRestartRingSegments, {235, 235, 235, 255});
-    DrawTriangle({cx + ui::IconButtons::kRestartArrowA_X * uiScale,
-                  cy + ui::IconButtons::kRestartArrowA_Y * uiScale},
-                 {cx + ui::IconButtons::kRestartArrowB_X * uiScale,
-                  cy + ui::IconButtons::kRestartArrowB_Y * uiScale},
-                 {cx + ui::IconButtons::kRestartArrowC_X * uiScale,
-                  cy + ui::IconButtons::kRestartArrowC_Y * uiScale},
-                 ui::Dialog::kTextPrimary);
-  }
-
-  DrawText("U",
-           static_cast<int>(undoButton.x +
-                            ui::IconButtons::kFallbackRotateLabelX * uiScale),
-           static_cast<int>(undoButton.y +
-                            ui::IconButtons::kFallbackRotateLabelY * uiScale),
-           static_cast<int>(ui::IconButtons::kIconSize * uiScale),
-           ui::Dialog::kTextPrimary);
-
-  const auto drawCenteredHoverText = [this](Rectangle buttonRect, const char *text) {
-    const int tooltipFontSize =
-        static_cast<int>(ui::IconButtons::kTooltipFont * getUiScale());
-    const int textWidth = MeasureText(text, tooltipFontSize);
-    const float buttonCenterX = buttonRect.x + buttonRect.width * 0.5f;
-    const int textX = static_cast<int>(buttonCenterX - textWidth * 0.5f);
-    const int textY = static_cast<int>(buttonRect.y -
-                                       ui::IconButtons::kTooltipYOffset * getUiScale());
-    DrawText(text, textX, textY, tooltipFontSize, ui::IconButtons::kTooltipText);
-  };
-
-  if (rotateHovered) {
-    drawCenteredHoverText(rotateButton, "Rotate board");
-  }
-  if (restartHovered) {
-    drawCenteredHoverText(restartButton, "Restart game");
-  }
-  if (settingsHovered) {
-    drawCenteredHoverText(settingsButton, "Window size");
-  }
-  if (undoHovered) {
-    drawCenteredHoverText(undoButton, "Undo move");
-  }
+  ui::Button undoBtn(undoButton, "Und", iconStyle); // No texture for undo currently, fallback to text
+  undoBtn.setTooltip("Undo move");
+  undoBtn.update(mousePos);
+  undoBtn.draw();
 
   const bool swapCapturedSections = isBoardFlipped_;
   const char *topTitle = "";
@@ -1357,6 +1220,7 @@ void ChessView::drawRightPanel(const Board &board, float whiteTimeLeft, float bl
   std::string topTimeStr = formatTime(swapCapturedSections ? blackTimeLeft : whiteTimeLeft);
   std::string bottomTimeStr = formatTime(swapCapturedSections ? whiteTimeLeft : blackTimeLeft);
 
+  const float uiScale = getUiScale();
   const int timerFontSize = static_cast<int>(32.0f * uiScale);
   const int boxWidth = static_cast<int>(120.0f * uiScale);
   const int boxHeight = static_cast<int>(45.0f * uiScale);
@@ -1381,289 +1245,188 @@ void ChessView::drawDialogsAndOverlays(bool showRestartConfirm,
                                        const ChessColor *winnerColor,
                                        const ChessColor *promotionColor) {
   if (gameState == GameState::Checkmate || gameState == GameState::Stalemate) {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Overlay::kGameOver);
-
-    const ui::AutoLayout::Metrics m =
-        ui::AutoLayout::ComputeMetrics(GetScreenWidth(), GetScreenHeight());
-    const Rectangle dialog = ui::AutoLayout::GameOverDialogRect(m);
-    const float heightScale = dialog.height / ui::GameOverDialog::kHeight;
-
-    const int titleFontSize =
-        static_cast<int>(ui::GameOverDialog::kTitleFont * heightScale);
-    const int bodyFontSize =
-        static_cast<int>(ui::GameOverDialog::kBodyFont * heightScale);
-    const int hintFontSize =
-        static_cast<int>(ui::GameOverDialog::kHintFont * heightScale);
-
-    const char *titleText =
-        (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
-    const char *bodyText = "";
-    if (gameState == GameState::Checkmate) {
-      if (winnerColor != nullptr && *winnerColor == ChessColor::White) {
-        bodyText = "White wins";
-      } else if (winnerColor != nullptr && *winnerColor == ChessColor::Black) {
-        bodyText = "Black wins";
-      } else {
-        bodyText = "Win";
-      }
-    } else {
-      bodyText = "No legal moves and king is safe";
-    }
-    const char *hintText = "Press Restart to play again";
-
-    const int titleWidth = MeasureText(titleText, titleFontSize);
-    const int bodyWidth = MeasureText(bodyText, bodyFontSize);
-    const int hintWidth = MeasureText(hintText, hintFontSize);
-
-    DrawRectangleRounded(dialog, ui::GameOverDialog::kRoundness,
-                         ui::GameOverDialog::kRoundSegments,
-                         ui::GameOverDialog::kBackground);
-    DrawRectangleRoundedLinesEx(dialog, ui::GameOverDialog::kRoundness,
-                                ui::GameOverDialog::kRoundSegments,
-                                ui::GameOverDialog::kBorderWidth,
-                                ui::GameOverDialog::kBorder);
-
-    DrawText(titleText,
-             static_cast<int>(dialog.x + (dialog.width - titleWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kTitleY * heightScale),
-             titleFontSize,
-             (gameState == GameState::Checkmate)
-                 ? GetColor(ui::GameOverDialog::kCheckmateTitleColor)
-                 : GetColor(ui::GameOverDialog::kStalemateTitleColor));
-    DrawText(bodyText,
-             static_cast<int>(dialog.x + (dialog.width - bodyWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kBodyY * heightScale),
-             bodyFontSize, ui::GameOverDialog::kBody);
-    DrawText(hintText,
-             static_cast<int>(dialog.x + (dialog.width - hintWidth) * 0.5f),
-             static_cast<int>(dialog.y + ui::GameOverDialog::kHintY * heightScale),
-             hintFontSize, ui::GameOverDialog::kHint);
+    drawGameOverDialog(gameState, winnerColor);
   }
 
   if (showRestartConfirm) {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Overlay::kBase);
-
-    const Rectangle dialog = getRestartConfirmDialogRect();
-    const Rectangle yesButton = getRestartConfirmYesButtonRect();
-    const Rectangle noButton = getRestartConfirmNoButtonRect();
-    const Vector2 mousePos = GetMousePosition();
-
-    const float uiScale = getUiScale();
-    const int titleFontSize =
-        static_cast<int>(ui::Dialog::kRestartTitleFont * uiScale);
-    const int bodyFontSize = static_cast<int>(ui::Dialog::kRestartBodyFont * uiScale);
-    const int actionFontSize =
-        static_cast<int>(ui::Dialog::kRestartActionFont * uiScale);
-    const char *titleText = "Restart game?";
-    const char *bodyText = "Current match progress will be lost.";
-    const char *yesText = "Yes";
-    const char *noText = "No";
-
-    const int titleTextWidth = MeasureText(titleText, titleFontSize);
-    const int bodyTextWidth = MeasureText(bodyText, bodyFontSize);
-    const int yesTextWidth = MeasureText(yesText, actionFontSize);
-    const int noTextWidth = MeasureText(noText, actionFontSize);
-
-    const int titleX = static_cast<int>(
-        dialog.x + (dialog.width - static_cast<float>(titleTextWidth)) * 0.5f);
-    const int titleY =
-        static_cast<int>(dialog.y + ui::Dialog::kRestartTitleY * uiScale);
-    const int bodyX = static_cast<int>(
-        dialog.x + (dialog.width - static_cast<float>(bodyTextWidth)) * 0.5f);
-    const int bodyY =
-        static_cast<int>(dialog.y + ui::Dialog::kRestartBodyY * uiScale);
-
-    DrawRectangleRounded(dialog, ui::Dialog::kRoundness,
-                         ui::Dialog::kRoundSegments, ui::Dialog::kBackground);
-    DrawRectangleRoundedLinesEx(dialog, ui::Dialog::kRoundness,
-                                ui::Dialog::kRoundSegments,
-                                ui::Dialog::kBorderWidth, ui::Dialog::kBorder);
-    DrawText(titleText, titleX, titleY, titleFontSize, ui::Dialog::kTextPrimary);
-    DrawText(bodyText, bodyX, bodyY, bodyFontSize, ui::Dialog::kTextSecondary);
-
-    const bool yesHovered = CheckCollisionPointRec(mousePos, yesButton);
-    const bool noHovered = CheckCollisionPointRec(mousePos, noButton);
-
-    DrawRectangleRounded(yesButton, ui::ActionButton::kRoundness,
-                         ui::ActionButton::kSegments,
-                         yesHovered ? ui::ActionButton::kPositiveFillHover
-                                    : ui::ActionButton::kPositiveFill);
-    DrawRectangleRoundedLinesEx(yesButton, ui::ActionButton::kRoundness,
-                                ui::ActionButton::kSegments,
-                                ui::ActionButton::kBorderWidth,
-                                yesHovered ? ui::ActionButton::kPositiveBorderHover
-                                           : ui::ActionButton::kPositiveBorder);
-    DrawText(yesText,
-             static_cast<int>(yesButton.x +
-                              (yesButton.width - static_cast<float>(yesTextWidth)) *
-                                  0.5f),
-             static_cast<int>(yesButton.y +
-                              (yesButton.height - static_cast<float>(actionFontSize)) *
-                                  0.5f),
-             actionFontSize, ui::ActionButton::kYesText);
-
-    DrawRectangleRounded(noButton, ui::ActionButton::kRoundness,
-                         ui::ActionButton::kSegments,
-                         noHovered ? ui::ActionButton::kNegativeFillHover
-                                   : ui::ActionButton::kNegativeFill);
-    DrawRectangleRoundedLinesEx(noButton, ui::ActionButton::kRoundness,
-                                ui::ActionButton::kSegments,
-                                ui::ActionButton::kBorderWidth,
-                                noHovered ? ui::ActionButton::kNegativeBorderHover
-                                          : ui::ActionButton::kNegativeBorder);
-    DrawText(noText,
-             static_cast<int>(noButton.x +
-                              (noButton.width - static_cast<float>(noTextWidth)) *
-                                  0.5f),
-             static_cast<int>(noButton.y +
-                              (noButton.height - static_cast<float>(actionFontSize)) *
-                                  0.5f),
-             actionFontSize, ui::ActionButton::kNoText);
+    drawRestartConfirmDialog();
   }
 
   if (showWindowSizeDialog) {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Overlay::kBase);
-
-    const Rectangle dialog = getWindowSizeDialogRect();
-    const Rectangle closeButton = getWindowSizeCloseButtonRect();
-    const Vector2 mousePos = GetMousePosition();
-    const float uiScale = getUiScale();
-
-    const int titleFontSize = static_cast<int>(ui::Dialog::kWindowTitleFont * uiScale);
-    const int optionFontSize =
-        static_cast<int>(ui::Dialog::kWindowOptionFont * uiScale);
-    const int closeFontSize = static_cast<int>(ui::Dialog::kWindowCloseFont * uiScale);
-
-    DrawRectangleRounded(dialog, ui::Dialog::kRoundness,
-                         ui::Dialog::kRoundSegments, ui::Dialog::kBackground);
-    DrawRectangleRoundedLinesEx(dialog, ui::Dialog::kRoundness,
-                                ui::Dialog::kRoundSegments,
-                                ui::Dialog::kBorderWidth, ui::Dialog::kBorder);
-
-    const char *titleText = "Settings";
-    const int titleWidth = MeasureText(titleText, titleFontSize);
-    DrawText(
-        titleText,
-        static_cast<int>(dialog.x + (dialog.width - static_cast<float>(titleWidth)) *
-                                      0.5f),
-        static_cast<int>(dialog.y + ui::Dialog::kWindowSizeTitleY * uiScale),
-        titleFontSize, ui::Dialog::kTextPrimary);
-
-    for (int index = 0; index < ui::Window::kSizePresetCount; ++index) {
-      const Rectangle optionRect = getWindowSizeOptionRect(index);
-      const bool hovered = CheckCollisionPointRec(mousePos, optionRect);
-
-      DrawRectangleRounded(optionRect, ui::OptionButton::kRoundness,
-                           ui::OptionButton::kSegments,
-                           hovered ? ui::OptionButton::kFillHover
-                                   : ui::OptionButton::kFill);
-      DrawRectangleRoundedLinesEx(optionRect, ui::OptionButton::kRoundness,
-                                  ui::OptionButton::kSegments,
-                                  ui::OptionButton::kBorderWidth,
-                                  hovered ? ui::OptionButton::kBorderHover
-                                          : ui::OptionButton::kBorder);
-
-      const char *sizeLabel = ui::Window::kSizePresets[index].label;
-      const int labelWidth = MeasureText(sizeLabel, optionFontSize);
-      DrawText(
-          sizeLabel,
-          static_cast<int>(optionRect.x +
-                           (optionRect.width - static_cast<float>(labelWidth)) *
-                               0.5f),
-          static_cast<int>(optionRect.y +
-                           (optionRect.height - static_cast<float>(optionFontSize)) *
-                               0.5f),
-          optionFontSize, ui::Dialog::kTextPrimary);
-    }
-
-    const Rectangle exitBtn = getExitToMenuButtonRect();
-    const bool exitHovered = CheckCollisionPointRec(mousePos, exitBtn);
-    DrawRectangleRounded(exitBtn, ui::OptionButton::kRoundness,
-                         ui::OptionButton::kSegments,
-                         exitHovered ? ui::OptionButton::kFillHover
-                                     : ui::OptionButton::kFill);
-    DrawRectangleRoundedLinesEx(exitBtn, ui::OptionButton::kRoundness,
-                                ui::OptionButton::kSegments,
-                                ui::OptionButton::kBorderWidth,
-                                exitHovered ? ui::OptionButton::kBorderHover
-                                        : ui::OptionButton::kBorder);
-    const char *exitText = "Return to Main Menu";
-    const int exitLabelWidth = MeasureText(exitText, optionFontSize);
-    DrawText(
-        exitText,
-        static_cast<int>(exitBtn.x + (exitBtn.width - static_cast<float>(exitLabelWidth)) * 0.5f),
-        static_cast<int>(exitBtn.y + (exitBtn.height - static_cast<float>(optionFontSize)) * 0.5f),
-        optionFontSize, ui::Dialog::kTextPrimary);
-
-    const bool closeHovered = CheckCollisionPointRec(mousePos, closeButton);
-    DrawRectangleRounded(closeButton, ui::ActionButton::kRoundness,
-                         ui::ActionButton::kSegments,
-                         closeHovered ? ui::ActionButton::kNegativeFillHover
-                                      : ui::ActionButton::kNegativeFill);
-    DrawRectangleRoundedLinesEx(closeButton, ui::ActionButton::kRoundness,
-                                ui::ActionButton::kSegments,
-                                ui::ActionButton::kBorderWidth,
-                                closeHovered ? ui::ActionButton::kNegativeBorderHover
-                                             : ui::ActionButton::kNegativeBorder);
-    const char *closeText = "X";
-    const int closeWidth = MeasureText(closeText, closeFontSize);
-    DrawText(
-        closeText,
-        static_cast<int>(closeButton.x +
-                         (closeButton.width - static_cast<float>(closeWidth)) *
-                             0.5f),
-        static_cast<int>(closeButton.y +
-                         (closeButton.height - static_cast<float>(closeFontSize)) *
-                             0.5f),
-        closeFontSize, ui::Dialog::kCloseText);
+    drawWindowSizeDialog();
   }
 
   if (promotionColor != nullptr) {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), ui::Overlay::kBase);
-
-    const Rectangle dialog = getPromotionDialogRect();
-    const Vector2 mousePos = GetMousePosition();
-    const float uiScale = getUiScale();
-    const int titleFontSize =
-        static_cast<int>(ui::Dialog::kPromotionTitleFont * uiScale);
-
-    DrawRectangleRounded(dialog, ui::Dialog::kRoundness,
-                         ui::Dialog::kRoundSegments, ui::Dialog::kBackground);
-    DrawRectangleRoundedLinesEx(dialog, ui::Dialog::kRoundness,
-                                ui::Dialog::kRoundSegments,
-                                ui::Dialog::kBorderWidth, ui::Dialog::kBorder);
-
-    const char *titleText = "Choose promotion";
-    const int titleWidth = MeasureText(titleText, titleFontSize);
-    DrawText(
-        titleText,
-        static_cast<int>(dialog.x + (dialog.width - static_cast<float>(titleWidth)) *
-                                      0.5f),
-        static_cast<int>(dialog.y + ui::Dialog::kPromotionTitleY * uiScale),
-        titleFontSize, ui::Dialog::kTextPrimary);
-
-    for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
-      const Rectangle optionRect = getPromotionOptionRect(index);
-      const bool hovered = CheckCollisionPointRec(mousePos, optionRect);
-
-      DrawRectangleRounded(optionRect, ui::OptionButton::kRoundness,
-                           ui::OptionButton::kSegments,
-                           hovered ? ui::OptionButton::kFillHover
-                                   : ui::OptionButton::kFill);
-      DrawRectangleRoundedLinesEx(optionRect, ui::OptionButton::kRoundness,
-                                  ui::OptionButton::kSegments,
-                                  ui::OptionButton::kBorderWidth,
-                                  hovered ? ui::OptionButton::kBorderHover
-                                          : ui::OptionButton::kBorder);
-
-      drawPiece(kPromotionOptions[index], *promotionColor, optionRect.x,
-                optionRect.y,
-                optionRect.width, optionRect.height,
-                ui::Dialog::kPromotionPieceScale);
-    }
+    drawPromotionDialog(*promotionColor);
   }
 }
 
+void ChessView::drawGameOverDialog(GameState gameState, const ChessColor *winnerColor) {
+  const ui::AutoLayout::Metrics &m = getMetrics();
+  const Rectangle dialogRect = ui::AutoLayout::GameOverDialogRect(m);
+  const float heightScale = dialogRect.height / ui::GameOverDialog::kHeight;
+
+  const char *titleText =
+      (gameState == GameState::Checkmate) ? "Checkmate" : "Stalemate";
+  const char *bodyText = "";
+  if (gameState == GameState::Checkmate) {
+    if (winnerColor != nullptr && *winnerColor == ChessColor::White)
+      bodyText = "White wins";
+    else if (winnerColor != nullptr && *winnerColor == ChessColor::Black)
+      bodyText = "Black wins";
+    else
+      bodyText = "Win";
+  } else {
+    bodyText = "No legal moves and king is safe";
+  }
+
+  ui::DialogStyle style;
+  style.overlayColor = ui::Overlay::kGameOver;
+  style.backgroundColor = ui::GameOverDialog::kBackground;
+  style.borderColor = ui::GameOverDialog::kBorder;
+  style.titleColor = (gameState == GameState::Checkmate) ? GetColor(ui::GameOverDialog::kCheckmateTitleColor) : GetColor(ui::GameOverDialog::kStalemateTitleColor);
+  style.bodyColor = ui::GameOverDialog::kBody;
+  style.titleFontSize = static_cast<int>(ui::GameOverDialog::kTitleFont * heightScale);
+  style.bodyFontSize = static_cast<int>(ui::GameOverDialog::kBodyFont * heightScale);
+
+  ui::DialogBox dialog(dialogRect, titleText, bodyText, style);
+  dialog.draw();
+
+  const int hintFontSize = static_cast<int>(ui::GameOverDialog::kHintFont * heightScale);
+  const char *hintText = "Press Restart to play again";
+  const int hintWidth = MeasureText(hintText, hintFontSize);
+  DrawText(hintText,
+           static_cast<int>(dialogRect.x + (dialogRect.width - hintWidth) * 0.5f),
+           static_cast<int>(dialogRect.y + ui::GameOverDialog::kHintY * heightScale),
+           hintFontSize, ui::GameOverDialog::kHint);
+}
+
+void ChessView::drawRestartConfirmDialog() {
+  const Rectangle dialogRect = getRestartConfirmDialogRect();
+  const float uiScale = getUiScale();
+
+  ui::DialogStyle dStyle;
+  dStyle.overlayColor = ui::Overlay::kBase;
+  dStyle.backgroundColor = ui::Dialog::kBackground;
+  dStyle.borderColor = ui::Dialog::kBorder;
+  dStyle.titleColor = ui::Dialog::kTextPrimary;
+  dStyle.bodyColor = ui::Dialog::kTextSecondary;
+  dStyle.titleFontSize = static_cast<int>(ui::Dialog::kRestartTitleFont * uiScale);
+  dStyle.bodyFontSize = static_cast<int>(ui::Dialog::kRestartBodyFont * uiScale);
+
+  ui::DialogBox dialog(dialogRect, "Restart game?", "Current match progress will be lost.", dStyle);
+  dialog.draw();
+
+  const Rectangle yesButtonRect = getRestartConfirmYesButtonRect();
+  const Rectangle noButtonRect = getRestartConfirmNoButtonRect();
+
+  ui::ButtonStyle yesStyle;
+  yesStyle.baseColor = ui::ActionButton::kPositiveFill;
+  yesStyle.hoverColor = ui::ActionButton::kPositiveFillHover;
+  yesStyle.borderColor = ui::ActionButton::kPositiveBorder;
+  yesStyle.borderHoverColor = ui::ActionButton::kPositiveBorderHover;
+  yesStyle.textColor = ui::ActionButton::kYesText;
+  yesStyle.fontSize = static_cast<int>(ui::Dialog::kRestartActionFont * uiScale);
+
+  ui::Button yesBtn(yesButtonRect, "Yes", yesStyle);
+  yesBtn.update(GetMousePosition());
+  yesBtn.draw();
+
+  ui::ButtonStyle noStyle;
+  noStyle.baseColor = ui::ActionButton::kNegativeFill;
+  noStyle.hoverColor = ui::ActionButton::kNegativeFillHover;
+  noStyle.borderColor = ui::ActionButton::kNegativeBorder;
+  noStyle.borderHoverColor = ui::ActionButton::kNegativeBorderHover;
+  noStyle.textColor = ui::ActionButton::kNoText;
+  noStyle.fontSize = static_cast<int>(ui::Dialog::kRestartActionFont * uiScale);
+
+  ui::Button noBtn(noButtonRect, "No", noStyle);
+  noBtn.update(GetMousePosition());
+  noBtn.draw();
+}
+
+void ChessView::drawWindowSizeDialog() {
+  const Rectangle dialogRect = getWindowSizeDialogRect();
+  const float uiScale = getUiScale();
+
+  ui::DialogStyle dStyle;
+  dStyle.overlayColor = ui::Overlay::kBase;
+  dStyle.backgroundColor = ui::Dialog::kBackground;
+  dStyle.borderColor = ui::Dialog::kBorder;
+  dStyle.titleColor = ui::Dialog::kTextPrimary;
+  dStyle.titleFontSize = static_cast<int>(ui::Dialog::kWindowTitleFont * uiScale);
+
+  ui::DialogBox dialog(dialogRect, "Settings", "", dStyle);
+  dialog.draw();
+
+  ui::ButtonStyle optionStyle;
+  optionStyle.baseColor = ui::OptionButton::kFill;
+  optionStyle.hoverColor = ui::OptionButton::kFillHover;
+  optionStyle.borderColor = ui::OptionButton::kBorder;
+  optionStyle.borderHoverColor = ui::OptionButton::kBorderHover;
+  optionStyle.textColor = ui::Dialog::kTextPrimary;
+  optionStyle.fontSize = static_cast<int>(ui::Dialog::kWindowOptionFont * uiScale);
+  optionStyle.roundness = ui::OptionButton::kRoundness;
+  optionStyle.borderWidth = ui::OptionButton::kBorderWidth;
+
+  for (int index = 0; index < ui::Window::kSizePresetCount; ++index) {
+    ui::Button optBtn(getWindowSizeOptionRect(index), ui::Window::kSizePresets[index].label, optionStyle);
+    optBtn.update(GetMousePosition());
+    optBtn.draw();
+  }
+
+  ui::Button exitBtn(getExitToMenuButtonRect(), "Return to Main Menu", optionStyle);
+  exitBtn.update(GetMousePosition());
+  exitBtn.draw();
+
+  ui::ButtonStyle closeStyle;
+  closeStyle.baseColor = ui::ActionButton::kNegativeFill;
+  closeStyle.hoverColor = ui::ActionButton::kNegativeFillHover;
+  closeStyle.borderColor = ui::ActionButton::kNegativeBorder;
+  closeStyle.borderHoverColor = ui::ActionButton::kNegativeBorderHover;
+  closeStyle.textColor = ui::Dialog::kCloseText;
+  closeStyle.fontSize = static_cast<int>(ui::Dialog::kWindowCloseFont * uiScale);
+
+  ui::Button closeBtn(getWindowSizeCloseButtonRect(), "X", closeStyle);
+  closeBtn.update(GetMousePosition());
+  closeBtn.draw();
+}
+
+void ChessView::drawPromotionDialog(ChessColor promotionColor) {
+  const Rectangle dialogRect = getPromotionDialogRect();
+  const float uiScale = getUiScale();
+
+  ui::DialogStyle dStyle;
+  dStyle.overlayColor = ui::Overlay::kBase;
+  dStyle.backgroundColor = ui::Dialog::kBackground;
+  dStyle.borderColor = ui::Dialog::kBorder;
+  dStyle.titleColor = ui::Dialog::kTextPrimary;
+  dStyle.titleFontSize = static_cast<int>(ui::Dialog::kPromotionTitleFont * uiScale);
+
+  ui::DialogBox dialog(dialogRect, "Choose promotion", "", dStyle);
+  dialog.draw();
+
+  ui::ButtonStyle optionStyle;
+  optionStyle.baseColor = ui::OptionButton::kFill;
+  optionStyle.hoverColor = ui::OptionButton::kFillHover;
+  optionStyle.borderColor = ui::OptionButton::kBorder;
+  optionStyle.borderHoverColor = ui::OptionButton::kBorderHover;
+  optionStyle.roundness = ui::OptionButton::kRoundness;
+  optionStyle.borderWidth = ui::OptionButton::kBorderWidth;
+
+  for (int index = 0; index < ui::Dialog::kPromotionOptionCount; ++index) {
+    Rectangle optionRect = getPromotionOptionRect(index);
+    // Draw button background
+    ui::Button optBtn(optionRect, "", optionStyle);
+    optBtn.update(GetMousePosition());
+    optBtn.draw();
+
+    // Draw piece on top
+    drawPiece(kPromotionOptions[index], promotionColor, optionRect.x,
+              optionRect.y, optionRect.width, optionRect.height,
+              ui::Dialog::kPromotionPieceScale);
+  }
+}
 void ChessView::update(const GameEvent &event) {
   (void)event;
 }

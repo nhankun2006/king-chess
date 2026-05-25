@@ -2,6 +2,8 @@
 #include "scenes/PlayMode.h"
 #include "scenes/main_menu/MainMenuScene.h"
 #include "config/UIConfig.h"
+#include "ui/Button.h"
+#include "ui/Dialog.h"
 #include <string>
 
 MenuView::MenuView() {
@@ -12,71 +14,6 @@ MenuView::MenuView() {
 MenuView::~MenuView() {
     UnloadTexture(titleImage_);
     UnloadTexture(bgImage_);
-}
-
-static Rectangle makeButton(float centerX, float centerY, int idx, float btnWidth, float btnHeight, float btnGap) {
-    float y = centerY + idx * btnGap - btnHeight * 0.8f + 50.0f * (btnHeight / 56.0f);
-    return {centerX - btnWidth / 2.0f, y, btnWidth, btnHeight};
-}
-
-static void drawMenuButton(Rectangle buttonRect, bool hovered, const char* text, float scale) {
-    if (hovered) {
-        const float boost = 2.0f * scale;
-        buttonRect.x -= boost;
-        buttonRect.y -= boost;
-        buttonRect.width += boost * 2.0f;
-        buttonRect.height += boost * 2.0f;
-    }
-
-    DrawRectangleRounded(buttonRect, ui::IconButtons::kRoundness,
-                         ui::IconButtons::kSegments,
-                         hovered ? ui::IconButtons::kButtonFillHover
-                                 : ui::IconButtons::kButtonFill);
-    DrawRectangleRoundedLinesEx(buttonRect, ui::IconButtons::kRoundness,
-                                ui::IconButtons::kSegments,
-                                ui::IconButtons::kBorderWidth,
-                                hovered ? ui::IconButtons::kButtonBorderHover
-                                        : ui::IconButtons::kButtonBorder);
-
-    int fontSize = static_cast<int>(26 * scale);
-    int textX = static_cast<int>(buttonRect.x + (buttonRect.width - MeasureText(text, fontSize)) / 2);
-    int textY = static_cast<int>(buttonRect.y + (buttonRect.height - fontSize) / 2);
-    
-    // Draw text twice with an offset to simulate bold weight
-    DrawText(text, textX, textY, fontSize, ui::Dialog::kTextPrimary);
-    DrawText(text, textX + 1, textY, fontSize, ui::Dialog::kTextPrimary);
-    DrawText(text, textX, textY + 1, fontSize, ui::Dialog::kTextPrimary);
-    DrawText(text, textX + 1, textY + 1, fontSize, ui::Dialog::kTextPrimary);
-}
-
-static void drawBackButton(Rectangle buttonRect, bool hovered, float scale) {
-    if (hovered) {
-        const float boost = 2.0f * scale;
-        buttonRect.x -= boost;
-        buttonRect.y -= boost;
-        buttonRect.width += boost * 2.0f;
-        buttonRect.height += boost * 2.0f;
-    }
-
-    DrawRectangleRounded(buttonRect, ui::IconButtons::kRoundness,
-                         ui::IconButtons::kSegments,
-                         hovered ? ui::IconButtons::kButtonFillHover
-                                 : ui::IconButtons::kButtonFill);
-    DrawRectangleRoundedLinesEx(buttonRect, ui::IconButtons::kRoundness,
-                                ui::IconButtons::kSegments,
-                                ui::IconButtons::kBorderWidth,
-                                hovered ? ui::IconButtons::kButtonBorderHover
-                                        : ui::IconButtons::kButtonBorder);
-
-    // Draw left arrow
-    Vector2 center = { buttonRect.x + buttonRect.width / 2.0f, buttonRect.y + buttonRect.height / 2.0f };
-    float size = 15.0f * scale;
-    float thick = 3.0f * scale;
-    Color color = ui::Dialog::kTextPrimary;
-    
-    DrawLineEx({ center.x + size * 0.5f, center.y }, { center.x - size * 0.5f, center.y }, thick, color);
-    DrawLineEx({ center.x - size * 0.5f, center.y }, { center.x, center.y - size * 0.5f }, thick, color);
-    DrawLineEx({ center.x - size * 0.5f, center.y }, { center.x, center.y + size * 0.5f }, thick, color);
 }
 
 void MenuView::render(const MenuModel& model) {
@@ -113,6 +50,42 @@ void MenuView::render(const MenuModel& model) {
     int titleFont = static_cast<int>(40 * scale);
     int subtitleFont = static_cast<int>(20 * scale);
 
+    auto makeButtonBounds = [&](int idx) -> Rectangle {
+        float y = centerY + idx * btnGap - btnHeight * 0.8f + 50.0f * (btnHeight / 56.0f);
+        return {centerX - btnWidth / 2.0f, y, btnWidth, btnHeight};
+    };
+
+    auto drawBtn = [&](Rectangle bounds, const char* text) {
+        ui::ButtonStyle style;
+        style.fontSize = static_cast<int>(26 * scale);
+        style.baseColor = ui::IconButtons::kButtonFill;
+        style.hoverColor = ui::IconButtons::kButtonFillHover;
+        style.borderColor = ui::IconButtons::kButtonBorder;
+        style.borderHoverColor = ui::IconButtons::kButtonBorderHover;
+        style.textColor = ui::Dialog::kTextPrimary;
+        style.roundness = ui::IconButtons::kRoundness;
+        style.segments = ui::IconButtons::kSegments;
+        style.borderWidth = ui::IconButtons::kBorderWidth;
+
+        ui::Button btn(bounds, text, style);
+        btn.update(GetMousePosition());
+        btn.draw();
+    };
+
+    auto drawBackBtn = [&](Rectangle bounds) {
+        ui::ButtonStyle style;
+        style.baseColor = ui::IconButtons::kButtonFill;
+        style.hoverColor = ui::IconButtons::kButtonFillHover;
+        style.borderColor = ui::IconButtons::kButtonBorder;
+        style.borderHoverColor = ui::IconButtons::kButtonBorderHover;
+        style.textColor = ui::Dialog::kTextPrimary;
+        style.fontSize = static_cast<int>(20 * scale);
+
+        ui::Button btn(bounds, "<-", style);
+        btn.update(GetMousePosition());
+        btn.draw();
+    };
+
     if (titleImage_.id != 0) {
         float titleScale = scale * 0.5f;
         float imgWidth = titleImage_.width * titleScale;
@@ -123,73 +96,57 @@ void MenuView::render(const MenuModel& model) {
         DrawText("KING CHESS", static_cast<int>(centerX - MeasureText("KING CHESS", titleFont) / 2), static_cast<int>(centerY - 150 * scale), titleFont, ui::Dialog::kTextPrimary);
     }
 
+    Rectangle backBounds = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
+
     if (model.state == MenuState::HOME) {
-        Rectangle b0 = makeButton(centerX, centerY, 0, btnWidth, btnHeight, btnGap);
-        Rectangle b1 = makeButton(centerX, centerY, 1, btnWidth, btnHeight, btnGap);
-        Rectangle b2 = makeButton(centerX, centerY, 2, btnWidth, btnHeight, btnGap);
-        Rectangle creditBtn = { GetScreenWidth() - 150.0f * scale, GetScreenHeight() - 60.0f * scale, 130.0f * scale, 40.0f * scale };
-        Vector2 m = GetMousePosition();
-
-        drawMenuButton(b0, CheckCollisionPointRec(m, b0), "Play", scale);
-        drawMenuButton(b1, CheckCollisionPointRec(m, b1), "Settings", scale);
-        drawMenuButton(b2, CheckCollisionPointRec(m, b2), "Quit", scale);
-        drawMenuButton(creditBtn, CheckCollisionPointRec(m, creditBtn), "Credit", scale);
+        drawBtn(makeButtonBounds(0), "Play");
+        drawBtn(makeButtonBounds(1), "Settings");
+        drawBtn(makeButtonBounds(2), "Quit");
+        drawBtn({ GetScreenWidth() - 150.0f * scale, GetScreenHeight() - 60.0f * scale, 130.0f * scale, 40.0f * scale }, "Credit");
     } else if (model.state == MenuState::PLAY_SELECT) {
-        Rectangle b0 = makeButton(centerX, centerY, 0, btnWidth, btnHeight, btnGap);
-        Rectangle b1 = makeButton(centerX, centerY, 1, btnWidth, btnHeight, btnGap);
-        Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
-        Vector2 m = GetMousePosition();
-        
-        drawMenuButton(b0, CheckCollisionPointRec(m, b0), "Player vs Player", scale);
-        drawMenuButton(b1, CheckCollisionPointRec(m, b1), "Player vs Bot", scale);
-        drawBackButton(back, CheckCollisionPointRec(m, back), scale);
+        drawBtn(makeButtonBounds(0), "Player vs Player");
+        drawBtn(makeButtonBounds(1), "Player vs Bot");
+        drawBackBtn(backBounds);
     } else if (model.state == MenuState::SELECT_MODE) {
-        Rectangle n = makeButton(centerX, centerY, 0, btnWidth, btnHeight, btnGap);
-        Rectangle l = makeButton(centerX, centerY, 1, btnWidth, btnHeight, btnGap);
-        Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
-        Vector2 m = GetMousePosition();
-
-        drawMenuButton(n, CheckCollisionPointRec(m, n), "New Game", scale);
-        drawMenuButton(l, CheckCollisionPointRec(m, l), "Load Profile", scale);
-        drawBackButton(back, CheckCollisionPointRec(m, back), scale);
+        drawBtn(makeButtonBounds(0), "New Game");
+        drawBtn(makeButtonBounds(1), "Load Profile");
+        drawBackBtn(backBounds);
     } else if (model.state == MenuState::SELECT_TIMER) {
-        // Time selection with left/right arrows
-        float arrowSize = 60.0f * scale; // Big arrows
+        float arrowSize = 60.0f * scale;
         float boxWidth = 200.0f * scale;
         
         Rectangle leftArrowBtn = { centerX - boxWidth/2 - arrowSize - 20.0f*scale, centerY - arrowSize/2 + 50.0f * (btnHeight / 56.0f), arrowSize, arrowSize };
         Rectangle rightArrowBtn = { centerX + boxWidth/2 + 20.0f*scale, centerY - arrowSize/2 + 50.0f * (btnHeight / 56.0f), arrowSize, arrowSize };
-        Rectangle startBtn = makeButton(centerX, centerY, 1.5f, btnWidth, btnHeight, btnGap);
-        Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
-        Vector2 m = GetMousePosition();
+        Rectangle startBtn = makeButtonBounds(1);
+        startBtn.y += 0.5f * btnGap; // Adjusted for 1.5f index in original
 
-        // Draw left arrow
-        bool leftHover = CheckCollisionPointRec(m, leftArrowBtn);
-        DrawRectangleRounded(leftArrowBtn, ui::IconButtons::kRoundness, ui::IconButtons::kSegments, leftHover ? ui::IconButtons::kButtonFillHover : ui::IconButtons::kButtonFill);
-        DrawRectangleRoundedLinesEx(leftArrowBtn, ui::IconButtons::kRoundness, ui::IconButtons::kSegments, ui::IconButtons::kBorderWidth, leftHover ? ui::IconButtons::kButtonBorderHover : ui::IconButtons::kButtonBorder);
-        DrawText("<", static_cast<int>(leftArrowBtn.x + leftArrowBtn.width/2 - MeasureText("<", static_cast<int>(40*scale))/2), static_cast<int>(leftArrowBtn.y + leftArrowBtn.height/2 - 20*scale), static_cast<int>(40*scale), ui::Dialog::kTextPrimary);
+        ui::ButtonStyle iconStyle;
+        iconStyle.fontSize = static_cast<int>(40 * scale);
+        iconStyle.baseColor = ui::IconButtons::kButtonFill;
+        iconStyle.hoverColor = ui::IconButtons::kButtonFillHover;
+        iconStyle.borderColor = ui::IconButtons::kButtonBorder;
+        iconStyle.borderHoverColor = ui::IconButtons::kButtonBorderHover;
+        
+        ui::Button btnLeft(leftArrowBtn, "<", iconStyle);
+        btnLeft.update(GetMousePosition());
+        btnLeft.draw();
 
-        // Draw right arrow
-        bool rightHover = CheckCollisionPointRec(m, rightArrowBtn);
-        DrawRectangleRounded(rightArrowBtn, ui::IconButtons::kRoundness, ui::IconButtons::kSegments, rightHover ? ui::IconButtons::kButtonFillHover : ui::IconButtons::kButtonFill);
-        DrawRectangleRoundedLinesEx(rightArrowBtn, ui::IconButtons::kRoundness, ui::IconButtons::kSegments, ui::IconButtons::kBorderWidth, rightHover ? ui::IconButtons::kButtonBorderHover : ui::IconButtons::kButtonBorder);
-        DrawText(">", static_cast<int>(rightArrowBtn.x + rightArrowBtn.width/2 - MeasureText(">", static_cast<int>(40*scale))/2), static_cast<int>(rightArrowBtn.y + rightArrowBtn.height/2 - 20*scale), static_cast<int>(40*scale), ui::Dialog::kTextPrimary);
+        ui::Button btnRight(rightArrowBtn, ">", iconStyle);
+        btnRight.update(GetMousePosition());
+        btnRight.draw();
 
-        // Draw current time box
         Rectangle timeBox = { centerX - boxWidth/2, centerY - arrowSize/2 + 50.0f * (btnHeight / 56.0f), boxWidth, arrowSize };
         
         std::string timeStr = std::to_string(model.selectedTimer) + " Min";
         int tSize = static_cast<int>(30*scale);
         DrawText(timeStr.c_str(), static_cast<int>(timeBox.x + (timeBox.width - MeasureText(timeStr.c_str(), tSize))/2), static_cast<int>(timeBox.y + (timeBox.height - tSize)/2), tSize, ui::Dialog::kTextPrimary);
 
-        drawMenuButton(startBtn, CheckCollisionPointRec(m, startBtn), "Start Game", scale);
-        drawBackButton(back, CheckCollisionPointRec(m, back), scale);
+        drawBtn(startBtn, "Start Game");
+        drawBackBtn(backBounds);
     } else if (model.state == MenuState::SETTINGS) {
         const char* text = "Settings... Wait for next update!";
         DrawText(text, static_cast<int>(centerX - MeasureText(text, subtitleFont) / 2), static_cast<int>(centerY), subtitleFont, ui::Dialog::kTextPrimary);
-        
-        Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
-        drawBackButton(back, CheckCollisionPointRec(GetMousePosition(), back), scale);
+        drawBackBtn(backBounds);
     } else if (model.state == MenuState::CREDITS) {
         int yOffset = -50;
         const char* credits[] = {
@@ -201,8 +158,6 @@ void MenuView::render(const MenuModel& model) {
             DrawText(line, static_cast<int>(centerX - MeasureText(line, subtitleFont) / 2), static_cast<int>(centerY + yOffset * scale), subtitleFont, ui::Dialog::kTextPrimary);
             yOffset += 40;
         }
-
-        Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
-        drawBackButton(back, CheckCollisionPointRec(GetMousePosition(), back), scale);
+        drawBackBtn(backBounds);
     }
 }
