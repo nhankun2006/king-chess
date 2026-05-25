@@ -155,8 +155,14 @@ std::optional<Protocol::Message> NetworkSession::tryReceive() {
 bool NetworkSession::isConnected() const { return connected_; }
 
 void NetworkSession::disconnect() {
+  // Early exit if already disconnected — makes this safe to call
+  // multiple times (e.g. explicit call + destructor).
+  bool expected = true;
+  if (!connected_.compare_exchange_strong(expected, false)) {
+    return;
+  }
+
   shouldStop_ = true;
-  connected_ = false;
 
   // Shutting down the socket unblocks any blocking recv() in the receive thread
   if (peerSocket_ != kInvalidSocket) {

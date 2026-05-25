@@ -51,7 +51,7 @@ Or use presets:
 ```bash
 # Debug build
 cmake --preset linux-debug
-cmake --build --preset linux-debug-build
+cmake --build --preset linux-build
 
 # Release build
 cmake --preset linux-release

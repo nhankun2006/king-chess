@@ -48,7 +48,16 @@ public:
 
     void setText(const std::string& text) { text_ = text; }
     void setBounds(Rectangle bounds) { bounds_ = bounds; }
-    void setDisabled(bool disabled) { state_ = disabled ? ButtonState::Disabled : ButtonState::Normal; }
+    void setDisabled(bool disabled) { 
+        if (disabled) {
+            state_ = ButtonState::Disabled;
+        } else if (state_ == ButtonState::Disabled) {
+            // Check if mouse is over button when re-enabling
+            Vector2 mousePos = GetMousePosition();
+            state_ = CheckCollisionPointRec(mousePos, bounds_) ? ButtonState::Hovered : ButtonState::Normal;
+        }
+    }
+
     void setOnClick(std::function<void()> callback) { onClick_ = callback; }
     void setIcon(Texture2D icon) { icon_ = icon; }
     void setTooltip(const std::string& tooltip) { tooltip_ = tooltip; }

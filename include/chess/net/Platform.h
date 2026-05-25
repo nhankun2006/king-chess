@@ -1,6 +1,8 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
+#include <stdexcept>
+
 /// Cross-platform socket abstraction.
 /// Wraps the ~5 API differences between POSIX sockets and Winsock2
 /// so that NetworkSession.cpp can use a single, platform-agnostic API.
@@ -21,12 +23,15 @@
   inline int closeSocket(SocketHandle s) { return closesocket(s); }
   inline int getLastSocketError() { return WSAGetLastError(); }
 
+
   /// RAII guard — calls WSAStartup on construction, WSACleanup on destruction.
   /// Create one instance at application startup (e.g. in main() or LobbyScene).
   struct WinsockInit {
     WinsockInit() {
       WSADATA data;
-      WSAStartup(MAKEWORD(2, 2), &data);
+      if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
+        throw std::runtime_error("WSAStartup failed");
+      }
     }
     ~WinsockInit() { WSACleanup(); }
 
