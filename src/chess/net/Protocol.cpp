@@ -21,12 +21,16 @@ std::vector<uint8_t> encodeMovePayload(const Move &move) {
 std::optional<Move> decodeMovePayload(const std::vector<uint8_t> &payload) {
   if (payload.size() < 7) return std::nullopt;
 
+  // Validate PieceType range before casting
+  uint8_t rawPromotion = payload[4];
+  if (rawPromotion > static_cast<uint8_t>(PieceType::King)) return std::nullopt;
+
   Move move;
   move.from.row = static_cast<int>(payload[0]);
   move.from.col = static_cast<int>(payload[1]);
   move.to.row = static_cast<int>(payload[2]);
   move.to.col = static_cast<int>(payload[3]);
-  move.promotion = static_cast<PieceType>(payload[4]);
+  move.promotion = static_cast<PieceType>(rawPromotion);
   move.isCastling = (payload[5] != 0);
   move.isEnPassant = (payload[6] != 0);
 
@@ -40,6 +44,9 @@ std::optional<Move> decodeMovePayload(const std::vector<uint8_t> &payload) {
 
 std::vector<uint8_t> encodeMessage(MessageType type,
                                    const std::vector<uint8_t> &payload) {
+  // Guard against payload sizes that would overflow the 2-byte length field
+  if (payload.size() > kMaxPayloadSize) return {};
+
   uint16_t payloadLen = static_cast<uint16_t>(payload.size());
 
   std::vector<uint8_t> msg;
@@ -60,12 +67,29 @@ std::vector<uint8_t> encodeMoveMessage(const Move &move) {
   return encodeMessage(MessageType::Move, encodeMovePayload(move));
 }
 
+/// Check whether a raw byte corresponds to a known MessageType value.
+static bool isValidMessageType(uint8_t raw) {
+  switch (static_cast<MessageType>(raw)) {
+  case MessageType::Move:
+  case MessageType::Restart:
+  case MessageType::Resign:
+  case MessageType::Ping:
+  case MessageType::Pong:
+    return true;
+  default:
+    return false;
+  }
+}
+
 std::optional<Message> decodeMessage(const uint8_t *data, size_t length,
                                      size_t &bytesConsumed) {
   bytesConsumed = 0;
 
   // Need at least the header
   if (length < kHeaderSize) return std::nullopt;
+
+  // Validate message type before casting
+  if (!isValidMessageType(data[0])) return std::nullopt;
 
   MessageType type = static_cast<MessageType>(data[0]);
   uint16_t payloadLen =

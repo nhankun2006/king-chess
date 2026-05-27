@@ -272,6 +272,16 @@ void NetworkSession::receiveLoop() {
     // Append received data to accumulation buffer
     accumulator.insert(accumulator.end(), recvBuf, recvBuf + bytesRead);
 
+    // Guard against unbounded accumulator growth from malformed streams
+    constexpr size_t kMaxAccumulatorSize =
+        Protocol::kHeaderSize + Protocol::kMaxPayloadSize;
+    if (accumulator.size() > kMaxAccumulatorSize) {
+      std::cerr << "[NetworkSession] Accumulator exceeded max size ("
+                << accumulator.size() << " bytes) — dropping connection\n";
+      connected_ = false;
+      break;
+    }
+
     // Decode as many complete messages as possible
     while (!accumulator.empty()) {
       size_t consumed = 0;

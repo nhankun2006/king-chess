@@ -1,6 +1,7 @@
 #include "scenes/playing/ChessView.h"
 
 #include <cmath>
+#include <algorithm>
 
 #include "config/UIConfig.h"
 #include "ui/Dialog.h"
