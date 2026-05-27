@@ -43,7 +43,6 @@ public:
     void update(Vector2 mousePos);
     void draw() const;
 
-    bool isClicked() const;
     ButtonState getState() const { return state_; }
 
     void setText(const std::string& text) { text_ = text; }

@@ -26,10 +26,6 @@ void Button::update(Vector2 mousePos) {
     }
 }
 
-bool Button::isClicked() const {
-    return state_ == ButtonState::Hovered && IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), bounds_);
-}
-
 void Button::draw() const {
     Color fill, border;
     
@@ -82,6 +78,20 @@ void Button::draw() const {
         float buttonCenterX = bounds_.x + bounds_.width * 0.5f;
         int textX = static_cast<int>(buttonCenterX - textWidth * 0.5f);
         int textY = static_cast<int>(bounds_.y - tooltipFontSize * 1.5f);
+
+        // Clamp horizontal position to stay on-screen
+        int screenW = GetScreenWidth();
+        if (textX < 0) textX = 0;
+        if (textX + textWidth > screenW) textX = screenW - textWidth;
+
+        // Flip below button if tooltip would go off the top edge
+        if (textY < 0) {
+            textY = static_cast<int>(bounds_.y + bounds_.height + tooltipFontSize * 0.5f);
+        }
+        // Final vertical clamp
+        int screenH = GetScreenHeight();
+        if (textY + tooltipFontSize > screenH) textY = screenH - tooltipFontSize;
+
         DrawText(tooltip_.c_str(), textX, textY, tooltipFontSize, {150, 160, 170, 255}); // Muted text color for tooltip
     }
 }
