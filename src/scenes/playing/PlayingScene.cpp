@@ -1,13 +1,19 @@
 #include "scenes/playing/PlayingScene.h"
 
 #include "chess/players/PlayerFactory.h"
+#include "chess/players/HumanPlayerAgent.h"
+#include "chess/players/NetworkPlayerAgent.h"
 #include "scenes/main_menu/MenuModel.h"
 
-PlayingScene::PlayingScene(PlayMode mode, bool loadSave)
-    : mode_(mode), shouldLoadSave_(loadSave) {}
+PlayingScene::PlayingScene(PlayMode mode, bool loadSave,
+                           NetworkSession *networkSession)
+    : mode_(mode), shouldLoadSave_(loadSave),
+      networkSession_(networkSession) {}
 
 PlayingScene::~PlayingScene() {
-  if (game_ != nullptr) {
+  // Don't autosave LAN games — there's no meaningful state to restore
+  if (game_ != nullptr && mode_ != PlayMode::LAN_Host &&
+      mode_ != PlayMode::LAN_Guest) {
     const std::string saveFile =
         (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
     game_->saveGame(saveFile);
@@ -16,8 +22,10 @@ PlayingScene::~PlayingScene() {
 
 void PlayingScene::update(SceneManager *manager) {
   if (!initialized_) {
+    const bool isLanGame =
+        (mode_ == PlayMode::LAN_Host || mode_ == PlayMode::LAN_Guest);
     const std::string saveFile =
-        (mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin";
+        isLanGame ? "" : ((mode_ == PlayMode::PvP) ? "save_pvp.bin" : "save_pve.bin");
 
     game_ = std::make_unique<Game>();
     game_->setTimeControl(g_targetTimeControl);
@@ -34,11 +42,32 @@ void PlayingScene::update(SceneManager *manager) {
       return;
     }
 
-    auto players = PlayerFactory::create(mode_);
-    controller_ = std::make_unique<ChessController>(
-        *game_, *view_, std::move(players.white), std::move(players.black), saveFile);
+    // Create player agents based on mode
+    std::unique_ptr<IPlayerAgent> whitePlayer;
+    std::unique_ptr<IPlayerAgent> blackPlayer;
 
-    if (shouldLoadSave_ && !game_->loadGame(saveFile)) {
+    if (mode_ == PlayMode::LAN_Host && networkSession_) {
+      // Host is White (local), Guest is Black (remote)
+      whitePlayer = std::make_unique<HumanPlayerAgent>(ChessColor::White);
+      blackPlayer = std::make_unique<NetworkPlayerAgent>(ChessColor::Black,
+                                                         *networkSession_);
+    } else if (mode_ == PlayMode::LAN_Guest && networkSession_) {
+      // Host is White (remote), Guest is Black (local)
+      whitePlayer = std::make_unique<NetworkPlayerAgent>(ChessColor::White,
+                                                         *networkSession_);
+      blackPlayer = std::make_unique<HumanPlayerAgent>(ChessColor::Black);
+    } else {
+      auto players = PlayerFactory::create(mode_);
+      whitePlayer = std::move(players.white);
+      blackPlayer = std::move(players.black);
+    }
+
+    controller_ = std::make_unique<ChessController>(
+        *game_, *view_, std::move(whitePlayer), std::move(blackPlayer),
+        saveFile, isLanGame ? networkSession_ : nullptr);
+
+    // Don't try to load saves for LAN games
+    if (!isLanGame && shouldLoadSave_ && !game_->loadGame(saveFile)) {
       loadFailed_ = true;
       loadFailStartTime_ = GetTime();
       loadFailMessage_ = "Failed to load " + saveFile + " - returning to menu";

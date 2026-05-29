@@ -11,6 +11,8 @@
 #include "scenes/playing/ChessController.h"
 #include "services/ChessSound.h"
 
+class NetworkSession;
+
 class PlayingScene : public Scene {
 private:
     std::unique_ptr<Game> game_;
@@ -26,8 +28,12 @@ private:
 
     static constexpr double kLoadFailMessageDurationSeconds_ = 1.5;
 
+    // Network session (owned by the LobbyScene, shared via raw pointer)
+    NetworkSession *networkSession_ = nullptr;
+
 public:
-    PlayingScene(PlayMode mode, bool loadSave);
+    PlayingScene(PlayMode mode, bool loadSave,
+                 NetworkSession *networkSession = nullptr);
     ~PlayingScene() override;
 
     void update(SceneManager* manager) override;

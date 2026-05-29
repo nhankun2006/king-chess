@@ -11,12 +11,15 @@
 #include "ChessView.h"
 #include "chess/model/Game.h"
 
+class NetworkSession;
+
 class IdleInteractionState;
 class DraggingInteractionState;
 class PromotionInteractionState;
 class RestartModalInteractionState;
 class WindowModalInteractionState;
 class BotTurnState;
+class NetworkWaitState;
 class ChessControllerState;
 
 class ChessController {
@@ -35,6 +38,7 @@ private:
   friend class RestartModalInteractionState;
   friend class WindowModalInteractionState;
   friend class BotTurnState;
+  friend class NetworkWaitState;
 
   Game *game_ = nullptr;
   ChessView *view_ = nullptr;
@@ -46,6 +50,9 @@ private:
   std::vector<Move> selectedLegalMoves_;
 
   bool botThinking_ = false;
+
+  // Network session (non-owning, null for local games)
+  NetworkSession *networkSession_ = nullptr;
 
   // Autosave settings
   bool autosaveOnMove_ = true;
@@ -64,13 +71,15 @@ private:
   bool isHumanVsBotMatch() const;
   bool undoForCurrentMode();
   bool gameIsPlayable() const;
+  bool isNetworkGame() const;
   void setState(std::unique_ptr<ChessControllerState> nextState);
 
 public:
   ChessController(Game &game, ChessView &view,
                   std::unique_ptr<IPlayerAgent> whitePlayer,
                   std::unique_ptr<IPlayerAgent> blackPlayer,
-                  const std::string &saveFileName = "save.bin");
+                  const std::string &saveFileName = "save.bin",
+                  NetworkSession *networkSession = nullptr);
   ~ChessController();
 
   bool processInput();

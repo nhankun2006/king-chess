@@ -6,17 +6,21 @@
 #include "scenes/playing/ChessControllerState.h"
 #include "scenes/playing/states/BotTurnState.h"
 #include "scenes/playing/states/IdleInteractionState.h"
+#include "scenes/playing/states/NetworkWaitState.h"
+#include "chess/net/NetworkSession.h"
 
 // Construction / Destruction
 ChessController::ChessController(Game &game, ChessView &view,
                                  std::unique_ptr<IPlayerAgent> whitePlayer,
                                  std::unique_ptr<IPlayerAgent> blackPlayer,
-                                 const std::string &saveFileName)
+                                 const std::string &saveFileName,
+                                 NetworkSession *networkSession)
     : game_(&game),
       view_(&view),
       whitePlayer_(std::move(whitePlayer)),
       blackPlayer_(std::move(blackPlayer)),
       state_(std::make_unique<IdleInteractionState>()),
+      networkSession_(networkSession),
       saveFileName_(saveFileName) {}
 
 ChessController::~ChessController() = default;
@@ -54,6 +58,12 @@ bool ChessController::applyMove(const Move &move) {
   }
 
   view_->onMoveApplied(move, willCapture);
+
+  // In a network game, send the move to the remote peer.
+  // We send after makeMove succeeds so the remote side only sees valid moves.
+  if (networkSession_ && networkSession_->isConnected()) {
+    networkSession_->sendMove(move);
+  }
 
   // Castling rook tween
   const Piece *movedPiece = game_->getBoard().getPieceAt(move.to);
@@ -93,6 +103,9 @@ bool ChessController::isInputBlockedByUi() const {
 }
 
 bool ChessController::undoForCurrentMode() {
+  // Undo is not allowed in LAN games — prevents state desync
+  if (isNetworkGame()) return false;
+
   if (isHumanVsBotMatch()) {
     // Undo twice so the human gets their own turn back
     const bool first = game_->undo();
@@ -116,6 +129,10 @@ bool ChessController::gameIsPlayable() const {
   const GameState gs = game_->getState();
   return gs != GameState::Checkmate && gs != GameState::Stalemate &&
          gs != GameState::Draw;
+}
+
+bool ChessController::isNetworkGame() const {
+  return networkSession_ != nullptr;
 }
 
 // ─── Feedback helpers ───────────────────────────────────────────────────────
@@ -169,7 +186,11 @@ bool ChessController::processInput() {
   if (state_ && !state_->isBotThinking() && !isInputBlockedByUi() && gameIsPlayable()) {
     const IPlayerAgent *player = currentPlayer();
     if (player != nullptr && player->isAutomated()) {
-      setState(std::make_unique<BotTurnState>());
+      if (isNetworkGame()) {
+        setState(std::make_unique<NetworkWaitState>());
+      } else {
+        setState(std::make_unique<BotTurnState>());
+      }
     }
   }
 
