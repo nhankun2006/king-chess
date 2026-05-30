@@ -9,6 +9,7 @@
 class App : public SceneManager {
 private:
     std::unique_ptr<Scene> currentScene_;
+    std::unique_ptr<Scene> pendingSceneInstance_;
     SceneType pendingSceneType_;
     bool isSceneChangePending_ = false;
     bool shouldClose_ = false;
@@ -21,8 +22,8 @@ public:
     ~App() override = default;
 
     // Interface của SceneManager
-    // Interface của SceneManager
     void changeScene(SceneType type) override;
+    void changeSceneWithInstance(std::unique_ptr<Scene> scene) override;
     void quit() override;
 
     void run();

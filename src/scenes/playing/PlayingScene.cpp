@@ -6,9 +6,9 @@
 #include "scenes/main_menu/MenuModel.h"
 
 PlayingScene::PlayingScene(PlayMode mode, bool loadSave,
-                           NetworkSession *networkSession)
+                           std::shared_ptr<NetworkSession> networkSession)
     : mode_(mode), shouldLoadSave_(loadSave),
-      networkSession_(networkSession) {}
+      networkSession_(std::move(networkSession)) {}
 
 PlayingScene::~PlayingScene() {
   // Don't autosave LAN games — there's no meaningful state to restore
@@ -64,7 +64,7 @@ void PlayingScene::update(SceneManager *manager) {
 
     controller_ = std::make_unique<ChessController>(
         *game_, *view_, std::move(whitePlayer), std::move(blackPlayer),
-        saveFile, isLanGame ? networkSession_ : nullptr);
+        saveFile, isLanGame ? networkSession_.get() : nullptr);
 
     // Don't try to load saves for LAN games
     if (!isLanGame && shouldLoadSave_ && !game_->loadGame(saveFile)) {

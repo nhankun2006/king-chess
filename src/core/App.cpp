@@ -1,6 +1,7 @@
 #include "core/App.h"
 #include "scenes/main_menu/MainMenuScene.h"
 #include "scenes/playing/PlayingScene.h"
+#include "scenes/lobby/LobbyScene.h"
 
 #include <memory>
 
@@ -21,6 +22,8 @@ std::unique_ptr<Scene> App::createScene(SceneType type) {
             return std::make_unique<PlayingScene>(PlayMode::PvP, true);
         case SceneType::PLAYING_LOADED_PVE:
             return std::make_unique<PlayingScene>(PlayMode::PvE, true);
+        case SceneType::LOBBY:
+            return std::make_unique<LobbyScene>();
         default:
             return std::make_unique<MainMenuScene>();
     }
@@ -32,6 +35,11 @@ void App::changeScene(SceneType type) {
     isSceneChangePending_ = true;
 }
 
+void App::changeSceneWithInstance(std::unique_ptr<Scene> scene) {
+    pendingSceneInstance_ = std::move(scene);
+    isSceneChangePending_ = true;
+}
+
 void App::quit() {
     shouldClose_ = true;
 }
@@ -40,7 +48,11 @@ void App::run() {
     while (!WindowShouldClose() && !shouldClose_) {
         // Đổi cảnh nếu có yêu cầu
         if (isSceneChangePending_) {
-            currentScene_ = createScene(pendingSceneType_);
+            if (pendingSceneInstance_) {
+                currentScene_ = std::move(pendingSceneInstance_);
+            } else {
+                currentScene_ = createScene(pendingSceneType_);
+            }
             isSceneChangePending_ = false;
         }
 

@@ -45,6 +45,7 @@ void MenuController::update(SceneManager* manager) {
     } else if (model_->state == MenuState::PLAY_SELECT) {
         Rectangle b0 = makeButton(centerX, centerY, 0, btnWidth, btnHeight, btnGap);
         Rectangle b1 = makeButton(centerX, centerY, 1, btnWidth, btnHeight, btnGap);
+        Rectangle b2 = makeButton(centerX, centerY, 2, btnWidth, btnHeight, btnGap);
         Rectangle back = { 20.0f * scale, GetScreenHeight() - 40.0f * scale - 20.0f * scale, 80.0f * scale, 40.0f * scale };
         if (clicked) {
             if (CheckCollisionPointRec(mousePos, b0)) {
@@ -53,6 +54,8 @@ void MenuController::update(SceneManager* manager) {
             } else if (CheckCollisionPointRec(mousePos, b1)) {
                 model_->selectedMode = PlayMode::PvE;
                 model_->state = MenuState::SELECT_MODE;
+            } else if (CheckCollisionPointRec(mousePos, b2)) {
+                manager->changeScene(SceneType::LOBBY);
             } else if (CheckCollisionPointRec(mousePos, back)) {
                 model_->state = MenuState::HOME;
             }

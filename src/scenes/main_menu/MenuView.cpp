@@ -106,6 +106,7 @@ void MenuView::render(const MenuModel& model) {
     } else if (model.state == MenuState::PLAY_SELECT) {
         drawBtn(makeButtonBounds(0), "Player vs Player");
         drawBtn(makeButtonBounds(1), "Player vs Bot");
+        drawBtn(makeButtonBounds(2), "LAN Game");
         drawBackBtn(backBounds);
     } else if (model.state == MenuState::SELECT_MODE) {
         drawBtn(makeButtonBounds(0), "New Game");

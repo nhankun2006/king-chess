@@ -10,8 +10,7 @@
 #include "scenes/playing/ChessView.h"
 #include "scenes/playing/ChessController.h"
 #include "services/ChessSound.h"
-
-class NetworkSession;
+#include "chess/net/NetworkSession.h"
 
 class PlayingScene : public Scene {
 private:
@@ -28,12 +27,12 @@ private:
 
     static constexpr double kLoadFailMessageDurationSeconds_ = 1.5;
 
-    // Network session (owned by the LobbyScene, shared via raw pointer)
-    NetworkSession *networkSession_ = nullptr;
+    // Network session (shared with LobbyScene to keep alive during gameplay)
+    std::shared_ptr<NetworkSession> networkSession_;
 
 public:
     PlayingScene(PlayMode mode, bool loadSave,
-                 NetworkSession *networkSession = nullptr);
+                 std::shared_ptr<NetworkSession> networkSession = nullptr);
     ~PlayingScene() override;
 
     void update(SceneManager* manager) override;
